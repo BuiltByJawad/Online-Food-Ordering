@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 interface RegisterResponse {
@@ -31,6 +32,8 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function RegisterPage() {
+  const router = useRouter();
+
   const {
     register,
     handleSubmit,
@@ -62,7 +65,8 @@ export default function RegisterPage() {
       }
 
       toast.success('Registration successful. You are now logged in.');
-      reset({ ...values, password: '' });
+      reset({ email: '', password: '', name: '', phone: '' });
+      router.replace('/');
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Registration failed';
@@ -79,8 +83,8 @@ export default function RegisterPage() {
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Email</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="email"
@@ -96,8 +100,8 @@ export default function RegisterPage() {
 
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Password</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="password"

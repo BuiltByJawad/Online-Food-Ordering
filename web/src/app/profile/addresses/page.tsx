@@ -231,8 +231,8 @@ export default function AddressesPage() {
         >
           <div className="md:col-span-1">
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Label</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
@@ -248,8 +248,8 @@ export default function AddressesPage() {
 
           <div className="md:col-span-1">
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>City</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
@@ -313,8 +313,8 @@ export default function AddressesPage() {
 
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Country</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
