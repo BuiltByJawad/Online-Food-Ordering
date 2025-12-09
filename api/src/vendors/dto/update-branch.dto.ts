@@ -4,7 +4,9 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  IsEnum,
 } from 'class-validator';
+import { BranchStatus } from '../branch-status.enum';
 
 export class UpdateBranchDto {
   @IsOptional()
@@ -52,4 +54,8 @@ export class UpdateBranchDto {
   @IsOptional()
   @IsObject()
   deliveryZones?: Record<string, any>;
+
+  @IsOptional()
+  @IsEnum(BranchStatus)
+  status?: BranchStatus;
 }

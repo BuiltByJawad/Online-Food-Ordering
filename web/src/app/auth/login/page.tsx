@@ -1,71 +1,14 @@
 'use client';
 
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
-
-interface LoginResponse {
-  user: {
-    id: string;
-    email: string;
-    name?: string;
-    phone?: string;
-    role: string;
-    status: string;
-  };
-  accessToken: string;
-}
-
-const schema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters long')
-    .max(64, 'Password must be at most 64 characters long'),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { useLoginForm } from '../hooks';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { form, handleSubmit } = useLoginForm();
 
   const {
     register,
-    handleSubmit,
     formState: { errors, isSubmitting },
-    reset,
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
-
-  const onSubmit = async (values: FormValues) => {
-    toast.dismiss();
-
-    try {
-      const data = await api.post<LoginResponse>('/auth/login', {
-        email: values.email,
-        password: values.password,
-      });
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('accessToken', data.accessToken);
-      }
-
-      toast.success('Login successful.');
-      reset({ email: '', password: '' });
-      router.replace('/');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed';
-      toast.error(message);
-    }
-  };
+  } = form;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
@@ -73,7 +16,7 @@ export default function LoginPage() {
         <h1 className="mb-6 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
           Sign in
         </h1>
-        <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
               <span>Email</span>

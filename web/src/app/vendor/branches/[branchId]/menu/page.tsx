@@ -1,122 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-
-interface MenuOption {
-  id: string;
-  type: string;
-  name: string;
-  priceDelta: number | string;
-  isRequired: boolean;
-  maxSelection?: number | null;
-}
-
-interface MenuItem {
-  id: string;
-  name: string;
-  description?: string | null;
-  imageUrl?: string | null;
-  basePrice: number | string;
-  taxCategory?: string | null;
-  isAvailable: boolean;
-  availabilitySchedule?: Record<string, any> | null;
-  options: MenuOption[];
-}
-
-interface MenuCategory {
-  id: string;
-  name: string;
-  sortOrder: number;
-  items: MenuItem[];
-}
-
-interface UserProfile {
-  id: string;
-  email: string;
-  role: string;
-}
-
-const categorySchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Name is required')
-    .max(255, 'Name is too long'),
-  sortOrder: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || !Number.isNaN(Number(val)),
-      'Sort order must be a number',
-    ),
-});
-
-const itemSchema = z.object({
-  categoryId: z.string().min(1, 'Category is required'),
-  name: z
-    .string()
-    .min(1, 'Name is required')
-    .max(255, 'Name is too long'),
-  description: z
-    .string()
-    .max(2000, 'Description is too long')
-    .optional()
-    .or(z.literal('')),
-  imageUrl: z
-    .string()
-    .url('Please enter a valid image URL')
-    .optional()
-    .or(z.literal('')),
-  basePrice: z
-    .string()
-    .min(1, 'Base price is required')
-    .refine(
-      (val) => !Number.isNaN(Number(val)),
-      'Base price must be a number',
-    ),
-  taxCategory: z
-    .string()
-    .max(64, 'Tax category is too long')
-    .optional()
-    .or(z.literal('')),
-  isAvailable: z.boolean().optional(),
-});
-
-const optionSchema = z.object({
-  itemId: z.string().min(1, 'Item is required'),
-  type: z
-    .string()
-    .min(1, 'Type is required')
-    .max(32, 'Type is too long'),
-  name: z
-    .string()
-    .min(1, 'Name is required')
-    .max(255, 'Name is too long'),
-  priceDelta: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || !Number.isNaN(Number(val)),
-      'Price difference must be a number',
-    ),
-  isRequired: z.boolean().optional(),
-  maxSelection: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || !Number.isNaN(Number(val)),
-      'Max selection must be a number',
-    ),
-});
-
-type CategoryFormValues = z.infer<typeof categorySchema>;
-type ItemFormValues = z.infer<typeof itemSchema>;
-type OptionFormValues = z.infer<typeof optionSchema>;
+import {
+  categorySchema,
+  itemSchema,
+  optionSchema,
+  type CategoryFormValues,
+  type ItemFormValues,
+  type OptionFormValues,
+} from './schemas';
+import { useBranchMenu } from './hooks';
 
 interface BranchMenuPageProps {
   params: {
@@ -128,8 +23,17 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
   const router = useRouter();
   const { branchId } = params;
 
-  const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const {
+    loading,
+    categories,
+    createCategory,
+    createItem,
+    createOption,
+    deleteCategory,
+    deleteItem,
+    toggleItemAvailability,
+    deleteOption,
+  } = useBranchMenu(branchId);
 
   const {
     register: registerCategory,
@@ -178,131 +82,16 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
       maxSelection: '',
     },
   });
-
-  useEffect(() => {
-    const loadMenu = async () => {
-      const token =
-        typeof window !== 'undefined'
-          ? window.localStorage.getItem('accessToken')
-          : null;
-
-      if (!token) {
-        toast.error('You are not logged in.');
-        router.replace('/auth/login');
-        return;
-      }
-
-      try {
-        const user = await api.get<UserProfile>('/users/me', token);
-
-        if (user.role !== 'vendor_manager') {
-          toast.error('You do not have access to the vendor portal.');
-          router.replace('/');
-          return;
-        }
-
-        const data = await api.get<MenuCategory[]>(
-          `/branches/${branchId}/menu`,
-          token,
-        );
-        setCategories(data);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load branch menu';
-        toast.error(message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMenu();
-  }, [branchId, router]);
-
-  const refreshMenu = async () => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      const data = await api.get<MenuCategory[]>(
-        `/branches/${branchId}/menu`,
-        token,
-      );
-      setCategories(data);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to load branch menu';
-      toast.error(message);
-    }
-  };
-
   const onCreateCategory = async (values: CategoryFormValues) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    const sortOrder = values.sortOrder ? Number(values.sortOrder) : undefined;
-
-    try {
-      await api.post(
-        `/branches/${branchId}/menu-categories`,
-        {
-          name: values.name,
-          sortOrder,
-        },
-        token,
-      );
-
-      toast.success('Category created.');
+    const ok = await createCategory(values);
+    if (ok) {
       resetCategory({ name: '', sortOrder: '' });
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to create category';
-      toast.error(message);
     }
   };
 
   const onCreateItem = async (values: ItemFormValues) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    const basePrice = Number(values.basePrice);
-
-    try {
-      await api.post(
-        `/menu-categories/${values.categoryId}/items`,
-        {
-          name: values.name,
-          description: values.description || undefined,
-          imageUrl: values.imageUrl || undefined,
-          basePrice,
-          taxCategory: values.taxCategory || undefined,
-          isAvailable: values.isAvailable ?? true,
-        },
-        token,
-      );
-
-      toast.success('Menu item created.');
+    const ok = await createItem(values);
+    if (ok) {
       resetItem({
         categoryId: values.categoryId,
         name: '',
@@ -312,44 +101,12 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
         taxCategory: '',
         isAvailable: true,
       });
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to create menu item';
-      toast.error(message);
     }
   };
 
   const onCreateOption = async (values: OptionFormValues) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    const priceDelta = values.priceDelta ? Number(values.priceDelta) : 0;
-    const maxSelection = values.maxSelection
-      ? Number(values.maxSelection)
-      : undefined;
-
-    try {
-      await api.post(
-        `/menu-items/${values.itemId}/options`,
-        {
-          type: values.type,
-          name: values.name,
-          priceDelta,
-          isRequired: values.isRequired ?? false,
-          maxSelection,
-        },
-        token,
-      );
-
-      toast.success('Menu option created.');
+    const ok = await createOption(values);
+    if (ok) {
       resetOption({
         itemId: values.itemId,
         type: '',
@@ -358,11 +115,6 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
         isRequired: false,
         maxSelection: '',
       });
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to create menu option';
-      toast.error(message);
     }
   };
 
@@ -371,25 +123,7 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
       return;
     }
 
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.delete(`/menu-categories/${categoryId}`, token);
-      toast.success('Category deleted.');
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to delete category';
-      toast.error(message);
-    }
+    await deleteCategory(categoryId);
   };
 
   const handleDeleteItem = async (itemId: string) => {
@@ -397,54 +131,14 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
       return;
     }
 
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.delete(`/menu-items/${itemId}`, token);
-      toast.success('Menu item deleted.');
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to delete menu item';
-      toast.error(message);
-    }
+    await deleteItem(itemId);
   };
 
   const handleToggleItemAvailability = async (
     itemId: string,
     current: boolean,
   ) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.patch(
-        `/menu-items/${itemId}`,
-        { isAvailable: !current },
-        token,
-      );
-      toast.success('Item availability updated.');
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to update item';
-      toast.error(message);
-    }
+    await toggleItemAvailability(itemId, current);
   };
 
   const handleDeleteOption = async (optionId: string) => {
@@ -452,25 +146,7 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
       return;
     }
 
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.delete(`/menu-options/${optionId}`, token);
-      toast.success('Menu option deleted.');
-      await refreshMenu();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to delete menu option';
-      toast.error(message);
-    }
+    await deleteOption(optionId);
   };
 
   if (loading) {
