@@ -84,6 +84,38 @@ describe('MenuService', () => {
     });
   });
 
+  describe('getBranchPublicInfo', () => {
+    it('throws NotFoundException when branch does not exist', async () => {
+      branchesRepository.findOne.mockResolvedValue(null as any);
+
+      await expect(service.getBranchPublicInfo('missing')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('returns minimal public info when branch exists', async () => {
+      const branch = {
+        id: 'branch-1',
+        name: 'Gulshan',
+        city: 'Dhaka',
+        country: 'BD',
+        vendor: { brandName: 'Pizza Place', name: 'Pizza Place Ltd' },
+      } as any as Branch;
+
+      branchesRepository.findOne.mockResolvedValue(branch as any);
+
+      const result = await service.getBranchPublicInfo(branch.id);
+
+      expect(result).toEqual({
+        id: branch.id,
+        name: branch.name,
+        city: branch.city,
+        country: branch.country,
+        vendorName: branch.vendor.brandName,
+      });
+    });
+  });
+
   describe('createCategoryForBranch', () => {
     const makeBranchWithOwner = (): Branch =>
       ({

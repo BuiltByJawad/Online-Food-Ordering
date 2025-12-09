@@ -30,6 +30,11 @@ export class MenuController {
     return this.menuService.getBranchMenu(branchId);
   }
 
+  @Get('branches/:branchId/info')
+  getBranchInfo(@Param('branchId') branchId: string) {
+    return this.menuService.getBranchPublicInfo(branchId);
+  }
+
   @Post('branches/:branchId/menu-categories')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
