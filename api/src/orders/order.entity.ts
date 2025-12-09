@@ -16,6 +16,9 @@ export class Order {
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   user: User;
 
+  @Column({ type: 'uuid', nullable: true })
+  branchId: string | null;
+
   @Column({ type: 'jsonb' })
   items: Array<{
     itemId: string;

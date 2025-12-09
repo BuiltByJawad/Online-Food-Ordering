@@ -2,6 +2,7 @@ import {
   ArrayMinSize,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Min,
   ValidateNested,
@@ -23,4 +24,8 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   @ArrayMinSize(1)
   items: OrderItemDto[];
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

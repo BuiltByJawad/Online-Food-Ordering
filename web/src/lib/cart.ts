@@ -10,112 +10,162 @@ export interface CartLine {
   quantity: number;
 }
 
+interface CartState {
+  branchId: string | null;
+  items: CartLine[];
+}
+
 const CART_STORAGE_KEY = 'customer-cart';
 
-function loadCartFromStorage(): CartLine[] {
+function loadCartFromStorage(): CartState {
   if (typeof window === 'undefined') {
-    return [];
+    return { branchId: null, items: [] };
   }
 
   try {
     const raw = window.localStorage.getItem(CART_STORAGE_KEY);
     if (!raw) {
-      return [];
+      return { branchId: null, items: [] };
     }
 
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
+
+    // Backwards compatibility: old format was an array of CartLine.
+    if (Array.isArray(parsed)) {
+      return {
+        branchId: null,
+        items: parsed as CartLine[],
+      };
     }
 
-    return parsed as CartLine[];
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      Array.isArray((parsed as any).items)
+    ) {
+      return {
+        branchId:
+          typeof (parsed as any).branchId === 'string'
+            ? (parsed as any).branchId
+            : null,
+        items: (parsed as any).items as CartLine[],
+      };
+    }
+
+    return { branchId: null, items: [] };
   } catch {
-    return [];
+    return { branchId: null, items: [] };
   }
 }
 
-function saveCartToStorage(items: CartLine[]): void {
+function saveCartToStorage(state: CartState): void {
   if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state));
   } catch {
     // Swallow storage errors to avoid breaking the UI.
   }
 }
 
 export function useCart() {
-  const [items, setItems] = useState<CartLine[]>([]);
+  const [cart, setCart] = useState<CartState>({ branchId: null, items: [] });
 
   useEffect(() => {
-    setItems(loadCartFromStorage());
+    setCart(loadCartFromStorage());
   }, []);
 
   useEffect(() => {
-    saveCartToStorage(items);
-  }, [items]);
+    saveCartToStorage(cart);
+  }, [cart]);
 
-  const addItem = (item: MenuItem) => {
+  const addItem = (branchId: string, item: MenuItem) => {
     const basePrice = Number(item.basePrice);
 
-    setItems((prev) => {
-      const existing = prev.find((line) => line.itemId === item.id);
+    setCart((prev) => {
+      const switchingBranch =
+        prev.branchId !== null && prev.branchId !== branchId;
+
+      const baseItems = switchingBranch ? [] : prev.items;
+
+      const existing = baseItems.find((line) => line.itemId === item.id);
+      let nextItems: CartLine[];
+
       if (existing) {
-        return prev.map((line) =>
+        nextItems = baseItems.map((line) =>
           line.itemId === item.id
             ? { ...line, quantity: line.quantity + 1 }
             : line,
         );
+      } else {
+        nextItems = [
+          ...baseItems,
+          {
+            itemId: item.id,
+            name: item.name,
+            basePrice,
+            quantity: 1,
+          },
+        ];
       }
 
-      return [
-        ...prev,
-        {
-          itemId: item.id,
-          name: item.name,
-          basePrice,
-          quantity: 1,
-        },
-      ];
+      return {
+        branchId,
+        items: nextItems,
+      };
     });
   };
 
   const increment = (itemId: string) => {
-    setItems((prev) =>
-      prev.map((line) =>
+    setCart((prev) => ({
+      ...prev,
+      items: prev.items.map((line) =>
         line.itemId === itemId
           ? { ...line, quantity: line.quantity + 1 }
           : line,
       ),
-    );
+    }));
   };
 
   const decrement = (itemId: string) => {
-    setItems((prev) =>
-      prev
+    setCart((prev) => ({
+      ...prev,
+      items: prev.items
         .map((line) =>
           line.itemId === itemId
             ? { ...line, quantity: line.quantity - 1 }
             : line,
         )
         .filter((line) => line.quantity > 0),
-    );
+    }));
   };
 
   const remove = (itemId: string) => {
-    setItems((prev) => prev.filter((line) => line.itemId !== itemId));
+    setCart((prev) => ({
+      ...prev,
+      items: prev.items.filter((line) => line.itemId !== itemId),
+    }));
   };
 
   const clear = () => {
-    setItems([]);
+    setCart({ branchId: null, items: [] });
   };
 
-  const total = items.reduce(
+  const total = cart.items.reduce(
     (sum, line) => sum + line.basePrice * line.quantity,
     0,
   );
 
-  return { items, addItem, increment, decrement, remove, clear, total };
+  return {
+    items: cart.items,
+    branchId: cart.branchId,
+    addItem,
+    increment,
+    decrement,
+    remove,
+    clear,
+    total,
+  };
 }

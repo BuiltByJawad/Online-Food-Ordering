@@ -99,6 +99,11 @@ export default function OrdersPage() {
                         timeStyle: 'short',
                       })}
                     </p>
+                    {order.branchId && (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Branch ID: {order.branchId}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

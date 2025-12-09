@@ -17,10 +17,18 @@ export default function CustomerBranchMenuPage({
   const { branchId } = params;
   const router = useRouter();
   const { categories, loading } = useCustomerBranchMenu(branchId);
-  const { items, addItem, increment, decrement, remove, total } = useCart();
+  const {
+    items,
+    branchId: cartBranchId,
+    addItem,
+    increment,
+    decrement,
+    remove,
+    total,
+  } = useCart();
 
   const handleAddToCart = (item: MenuItem) => {
-    addItem(item);
+    addItem(branchId, item);
   };
 
   if (loading) {
@@ -59,6 +67,8 @@ export default function CustomerBranchMenuPage({
   }
 
   const hasMenu = categories.some((category) => category.items.length > 0);
+  const isDifferentBranchCart =
+    cartBranchId !== null && cartBranchId !== branchId && items.length > 0;
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-zinc-50 px-4 py-8 dark:bg-black">
@@ -150,6 +160,14 @@ export default function CustomerBranchMenuPage({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             Your cart
           </h2>
+
+          {isDifferentBranchCart && (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Your cart currently has items from another branch. Adding items
+              from this branch will start a new order here and clear the
+              previous branch from your cart.
+            </p>
+          )}
 
           {items.length === 0 && (
             <p className="text-xs text-zinc-600 dark:text-zinc-400">

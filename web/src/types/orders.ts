@@ -16,4 +16,10 @@ export interface Order {
   totalAmount: number;
   status: string;
   createdAt: string;
+  branchId?: string | null;
+}
+
+export interface CreateOrderPayload {
+  items: OrderItemInput[];
+  branchId?: string | null;
 }
