@@ -81,6 +81,16 @@ export default function ProfilePage() {
             Address Book
           </a>
         </p>
+
+        <p className="mt-1 text-center text-sm text-zinc-600 dark:text-zinc-400">
+          View your recent orders in{' '}
+          <a
+            href="/orders"
+            className="font-medium text-zinc-900 underline dark:text-zinc-100"
+          >
+            My orders
+          </a>
+        </p>
       </div>
     </div>
   );

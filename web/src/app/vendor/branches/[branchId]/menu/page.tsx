@@ -151,10 +151,48 @@ export default function BranchMenuPage({ params }: BranchMenuPageProps) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
-          Loading branch menu...
-        </p>
+      <div className="flex min-h-screen items-start justify-center bg-zinc-50 px-4 py-8 dark:bg-black">
+        <div className="flex w-full max-w-5xl flex-col gap-6 rounded-xl bg-white p-6 shadow-md dark:bg-zinc-900">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="h-6 w-40 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-4 w-64 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="h-8 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+              <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+              <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+              <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <div className="h-4 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            <div className="space-y-2">
+              <div className="h-10 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-10 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-10 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
