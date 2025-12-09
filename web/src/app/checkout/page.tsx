@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart';
 import { api } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
-import type { OrderItemInput } from '@/types/orders';
+import type { CreateOrderPayload } from '@/types/orders';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, total, clear } = useCart();
+  const { items, total, clear, branchId } = useCart();
   const [placed, setPlaced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +31,9 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
-      const payload: { items: OrderItemInput[] } = {
+      const payload: CreateOrderPayload = {
         items: items.map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
+        ...(branchId ? { branchId } : {}),
       };
 
       await api.post('/orders', payload, token);

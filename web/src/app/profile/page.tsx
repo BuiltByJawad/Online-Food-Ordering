@@ -13,7 +13,22 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">Loading profile...</p>
+        <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-8 shadow-md dark:bg-zinc-900">
+          <div className="h-6 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="space-y-1">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          </div>
+
+          <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        </div>
       </div>
     );
   }

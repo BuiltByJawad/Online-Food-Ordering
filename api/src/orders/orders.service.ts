@@ -17,6 +17,7 @@ export class OrdersService {
   async createForUser(userId: string, dto: CreateOrderDto): Promise<Order> {
     const lines: Order['items'] = [];
     let total = 0;
+    const branchId = dto.branchId ?? null;
 
     for (const inputLine of dto.items) {
       const item = await this.itemsRepository.findOne({
@@ -45,6 +46,7 @@ export class OrdersService {
       items: lines,
       totalAmount: total,
       status: 'created',
+      branchId,
     });
 
     return this.ordersRepository.save(order);
