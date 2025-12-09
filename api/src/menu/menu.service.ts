@@ -45,6 +45,33 @@ export class MenuService {
     });
   }
 
+  async getBranchPublicInfo(branchId: string): Promise<{
+    id: string;
+    name: string;
+    city: string;
+    country: string;
+    vendorName: string | null;
+  }> {
+    const branch = await this.branchesRepository.findOne({
+      where: { id: branchId },
+      relations: ['vendor'],
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    const vendorName = branch.vendor?.brandName ?? branch.vendor?.name ?? null;
+
+    return {
+      id: branch.id,
+      name: branch.name,
+      city: branch.city,
+      country: branch.country,
+      vendorName,
+    };
+  }
+
   private async getBranchWithOwner(branchId: string): Promise<Branch> {
     const branch = await this.branchesRepository.findOne({
       where: { id: branchId },

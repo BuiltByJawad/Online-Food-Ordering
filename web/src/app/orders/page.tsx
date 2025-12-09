@@ -1,11 +1,83 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 import { useOrders } from './hooks';
+
+interface BranchPublicInfo {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  vendorName: string | null;
+}
 
 export default function OrdersPage() {
   const router = useRouter();
   const { orders, loading, error } = useOrders();
+
+  const [branchLabels, setBranchLabels] = useState<Record<string, string>>({});
+
+  const branchIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          orders
+            .map((order) => order.branchId)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      ),
+    [orders],
+  );
+
+  useEffect(() => {
+    if (branchIds.length === 0) {
+      setBranchLabels({});
+      return;
+    }
+
+    let isActive = true;
+
+    const load = async () => {
+      try {
+        const results = await Promise.all(
+          branchIds.map((id) =>
+            api
+              .get<BranchPublicInfo>(`/branches/${id}/info`)
+              .then((data) => ({ id, data }))
+              .catch(() => ({ id, data: null })),
+          ),
+        );
+
+        if (!isActive) return;
+
+        const next: Record<string, string> = {};
+
+        for (const { id, data } of results) {
+          if (!data) continue;
+
+          const vendorPrefix =
+            data.vendorName && data.vendorName !== data.name
+              ? `${data.vendorName} - `
+              : '';
+          const citySuffix = data.city ? ` (${data.city})` : '';
+
+          next[id] = `${vendorPrefix}${data.name}${citySuffix}`;
+        }
+
+        setBranchLabels(next);
+      } catch {
+        // If branch lookup fails, we silently fall back to showing the raw branch ID.
+      }
+    };
+
+    load();
+
+    return () => {
+      isActive = false;
+    };
+  }, [branchIds]);
 
   if (loading) {
     return (
@@ -101,7 +173,9 @@ export default function OrdersPage() {
                     </p>
                     {order.branchId && (
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        Branch ID: {order.branchId}
+                        {branchLabels[order.branchId]
+                          ? `From: ${branchLabels[order.branchId]}`
+                          : `Branch ID: ${order.branchId}`}
                       </p>
                     )}
                   </div>

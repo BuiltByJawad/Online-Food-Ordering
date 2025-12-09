@@ -120,10 +120,19 @@ export default function CheckoutPage() {
             )}
 
             {placed && !hasItems && !error && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                Your order has been placed (demo only). You can close this page
-                or go back home.
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  Your order has been placed (demo only). You can close this
+                  page or go back home.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push('/orders')}
+                  className="text-xs font-medium text-emerald-700 underline hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                >
+                  View my orders
+                </button>
+              </div>
             )}
           </div>
 
