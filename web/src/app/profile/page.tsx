@@ -1,101 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-
-interface UserProfile {
-  id: string;
-  email: string;
-  name?: string;
-  phone?: string;
-  role: string;
-  status: string;
-}
-
-const schema = z.object({
-  name: z.string().max(255, 'Name is too long').optional().or(z.literal('')),
-  phone: z.string().max(32, 'Phone is too long').optional().or(z.literal('')),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { useProfileForm } from './hooks';
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading, form, handleSubmit } = useProfileForm();
 
   const {
     register,
-    handleSubmit,
-    reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      name: '',
-      phone: '',
-    },
-  });
-
-  useEffect(() => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      setLoading(false);
-      return;
-    }
-
-    api
-      .get<UserProfile>('/users/me', token)
-      .then((data) => {
-        setProfile(data);
-        reset({
-          name: data.name ?? '',
-          phone: data.phone ?? '',
-        });
-      })
-      .catch((err: unknown) => {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load profile';
-        toast.error(message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [reset]);
-
-  const onSubmit = async (values: FormValues) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      const data = await api.patch<UserProfile>(
-        '/users/me',
-        { name: values.name || undefined, phone: values.phone || undefined },
-        token,
-      );
-      setProfile(data);
-      toast.success('Profile updated.');
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to update profile';
-      toast.error(message);
-    }
-  };
+  } = form;
 
   if (loading) {
     return (
@@ -117,11 +30,7 @@ export default function ProfilePage() {
           </p>
         )}
 
-        <form
-          className="space-y-4"
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-        >
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Name
