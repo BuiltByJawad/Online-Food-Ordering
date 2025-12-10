@@ -19,6 +19,17 @@ export class Order {
   @Column({ type: 'uuid', nullable: true })
   branchId: string | null;
 
+  @Column({ type: 'jsonb', nullable: true })
+  deliveryAddress: {
+    addressId: string;
+    label: string;
+    line1: string;
+    line2?: string | null;
+    city: string;
+    postalCode?: string | null;
+    country: string;
+  } | null;
+
   @Column({ type: 'jsonb' })
   items: Array<{
     itemId: string;

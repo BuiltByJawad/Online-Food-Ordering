@@ -6,6 +6,8 @@ import { OrdersService } from './orders.service';
 import { Order } from './order.entity';
 import { MenuItem } from '../menu/menu-item.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { Address } from '../addresses/address.entity';
+import { Branch } from '../vendors/branch.entity';
 
 const createOrderRepositoryMock = () => ({
   create: jest.fn(),
@@ -17,14 +19,26 @@ const createMenuItemRepositoryMock = () => ({
   findOne: jest.fn(),
 }) as unknown as jest.Mocked<Repository<MenuItem>>;
 
+const createAddressRepositoryMock = () => ({
+  findOne: jest.fn(),
+}) as unknown as jest.Mocked<Repository<Address>>;
+
+const createBranchRepositoryMock = () => ({
+  findOne: jest.fn(),
+}) as unknown as jest.Mocked<Repository<Branch>>;
+
 describe('OrdersService', () => {
   let service: OrdersService;
   let ordersRepository: jest.Mocked<Repository<Order>>;
   let itemsRepository: jest.Mocked<Repository<MenuItem>>;
+  let addressesRepository: jest.Mocked<Repository<Address>>;
+  let branchesRepository: jest.Mocked<Repository<Branch>>;
 
   beforeEach(async () => {
     ordersRepository = createOrderRepositoryMock();
     itemsRepository = createMenuItemRepositoryMock();
+    addressesRepository = createAddressRepositoryMock();
+    branchesRepository = createBranchRepositoryMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -36,6 +50,14 @@ describe('OrdersService', () => {
         {
           provide: getRepositoryToken(MenuItem),
           useValue: itemsRepository,
+        },
+        {
+          provide: getRepositoryToken(Address),
+          useValue: addressesRepository,
+        },
+        {
+          provide: getRepositoryToken(Branch),
+          useValue: branchesRepository,
         },
       ],
     }).compile();
@@ -102,10 +124,64 @@ describe('OrdersService', () => {
           totalAmount: expectedTotal,
           status: 'created',
           branchId: dto.branchId,
+          deliveryAddress: null,
         }),
       );
 
       expect(ordersRepository.save).toHaveBeenCalledWith(createdOrder);
+      expect(result).toBe(createdOrder);
+    });
+
+    it('creates an order with a deliveryAddress snapshot when addressId is provided', async () => {
+      const dto: CreateOrderDto = {
+        items: [{ itemId: 'item-1', quantity: 1 }],
+        addressId: 'addr-1',
+      };
+
+      const item = {
+        id: 'item-1',
+        name: 'Burger',
+        basePrice: 100,
+      } as unknown as MenuItem;
+
+      const address = {
+        id: 'addr-1',
+        label: 'Home',
+        line1: '123 Street',
+        line2: 'Apt 4',
+        city: 'Dhaka',
+        postalCode: '1234',
+        country: 'BD',
+      } as unknown as Address;
+
+      itemsRepository.findOne.mockResolvedValue(item as any);
+      addressesRepository.findOne.mockResolvedValue(address as any);
+
+      const createdOrder = { id: 'order-1' } as Order;
+      ordersRepository.create.mockReturnValue(createdOrder);
+      ordersRepository.save.mockResolvedValue(createdOrder);
+
+      const result = await service.createForUser(userId, dto);
+
+      expect(addressesRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: dto.addressId, user: { id: userId } } }),
+      );
+
+      expect(ordersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: { id: userId },
+          deliveryAddress: {
+            addressId: address.id,
+            label: address.label,
+            line1: address.line1,
+            line2: address.line2,
+            city: address.city,
+            postalCode: address.postalCode,
+            country: address.country,
+          },
+        }),
+      );
+
       expect(result).toBe(createdOrder);
     });
 
@@ -119,6 +195,29 @@ describe('OrdersService', () => {
       await expect(service.createForUser(userId, dto)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+      expect(ordersRepository.create).not.toHaveBeenCalled();
+      expect(ordersRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when addressId is provided but address is not found', async () => {
+      const dto: CreateOrderDto = {
+        items: [{ itemId: 'item-1', quantity: 1 }],
+        addressId: 'missing',
+      };
+
+      const item = {
+        id: 'item-1',
+        name: 'Burger',
+        basePrice: 100,
+      } as unknown as MenuItem;
+
+      itemsRepository.findOne.mockResolvedValue(item as any);
+      addressesRepository.findOne.mockResolvedValue(null as any);
+
+      await expect(service.createForUser(userId, dto)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+
       expect(ordersRepository.create).not.toHaveBeenCalled();
       expect(ordersRepository.save).not.toHaveBeenCalled();
     });

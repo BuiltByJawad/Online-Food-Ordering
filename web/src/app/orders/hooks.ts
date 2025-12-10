@@ -10,6 +10,17 @@ export function useOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchOrders = async (
+    token: string,
+    isActive?: () => boolean,
+  ): Promise<void> => {
+    const data = await api.get<Order[]>('/orders', token);
+
+    if (isActive && !isActive()) return;
+
+    setOrders(data ?? []);
+  };
+
   useEffect(() => {
     const token = getAccessToken();
 
@@ -23,12 +34,7 @@ export function useOrders() {
     setLoading(true);
     setError(null);
 
-    api
-      .get<Order[]>('/orders', token)
-      .then((data) => {
-        if (!isActive) return;
-        setOrders(data ?? []);
-      })
+    fetchOrders(token, () => isActive)
       .catch((err: any) => {
         if (!isActive) return;
         setError(err?.message ?? 'Failed to load orders');
@@ -43,5 +49,26 @@ export function useOrders() {
     };
   }, []);
 
-  return { orders, loading, error };
+  const reload = async (): Promise<void> => {
+    const token = getAccessToken();
+
+    if (!token) {
+      setError('AUTH_REQUIRED');
+      setOrders([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await fetchOrders(token);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { orders, loading, error, reload };
 }
