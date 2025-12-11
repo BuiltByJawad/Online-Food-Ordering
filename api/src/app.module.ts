@@ -5,13 +5,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
-<<<<<<< HEAD
-import { MenuModule } from './menu/menu.module';
-=======
 import { VendorsModule } from './vendors/vendors.module';
 import { MenuModule } from './menu/menu.module';
 import { OrdersModule } from './orders/orders.module';
->>>>>>> fd897c04ea83262b56abf608b5aae4be4db3f547
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -35,13 +32,10 @@ import { OrdersModule } from './orders/orders.module';
     }),
     UsersModule,
     AddressesModule,
-<<<<<<< HEAD
-    MenuModule,
-=======
     VendorsModule,
     MenuModule,
     OrdersModule,
->>>>>>> fd897c04ea83262b56abf608b5aae4be4db3f547
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
