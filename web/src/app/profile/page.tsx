@@ -1,106 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-
-interface UserProfile {
-  id: string;
-  email: string;
-  name?: string;
-  phone?: string;
-  role: string;
-  status: string;
-}
-
-const schema = z.object({
-  name: z.string().max(255, 'Name is too long').optional().or(z.literal('')),
-  phone: z.string().max(32, 'Phone is too long').optional().or(z.literal('')),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { useProfileForm } from './hooks';
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading, form, handleSubmit } = useProfileForm();
 
   const {
     register,
-    handleSubmit,
-    reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      name: '',
-      phone: '',
-    },
-  });
-
-  useEffect(() => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      setLoading(false);
-      return;
-    }
-
-    api
-      .get<UserProfile>('/users/me', token)
-      .then((data) => {
-        setProfile(data);
-        reset({
-          name: data.name ?? '',
-          phone: data.phone ?? '',
-        });
-      })
-      .catch((err: unknown) => {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load profile';
-        toast.error(message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [reset]);
-
-  const onSubmit = async (values: FormValues) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      const data = await api.patch<UserProfile>(
-        '/users/me',
-        { name: values.name || undefined, phone: values.phone || undefined },
-        token,
-      );
-      setProfile(data);
-      toast.success('Profile updated.');
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to update profile';
-      toast.error(message);
-    }
-  };
+  } = form;
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">Loading profile...</p>
+        <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-8 shadow-md dark:bg-zinc-900">
+          <div className="h-6 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="space-y-1">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          </div>
+
+          <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        </div>
       </div>
     );
   }
@@ -117,11 +45,7 @@ export default function ProfilePage() {
           </p>
         )}
 
-        <form
-          className="space-y-4"
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-        >
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Name
@@ -172,6 +96,28 @@ export default function ProfilePage() {
             Address Book
           </a>
         </p>
+
+        <p className="mt-1 text-center text-sm text-zinc-600 dark:text-zinc-400">
+          View your recent orders in{' '}
+          <a
+            href="/orders"
+            className="font-medium text-zinc-900 underline dark:text-zinc-100"
+          >
+            My orders
+          </a>
+        </p>
+
+        {profile?.role === 'rider' && (
+          <p className="mt-1 text-center text-sm text-zinc-600 dark:text-zinc-400">
+            Manage your deliveries in{' '}
+            <a
+              href="/rider/orders"
+              className="font-medium text-zinc-900 underline dark:text-zinc-100"
+            >
+              Rider portal
+            </a>
+          </p>
+        )}
       </div>
     </div>
   );

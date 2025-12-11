@@ -1,74 +1,14 @@
 'use client';
 
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-
-interface RegisterResponse {
-  user: {
-    id: string;
-    email: string;
-    name?: string;
-    phone?: string;
-    role: string;
-    status: string;
-  };
-  accessToken: string;
-}
-
-const schema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters long')
-    .max(64, 'Password must be at most 64 characters long'),
-  name: z.string().max(255, 'Name is too long').optional().or(z.literal('')),
-  phone: z.string().max(32, 'Phone is too long').optional().or(z.literal('')),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { useRegisterForm } from '../hooks';
 
 export default function RegisterPage() {
+  const { form, handleSubmit } = useRegisterForm();
+
   const {
     register,
-    handleSubmit,
     formState: { errors, isSubmitting },
-    reset,
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      email: '',
-      password: '',
-      name: '',
-      phone: '',
-    },
-  });
-
-  const onSubmit = async (values: FormValues) => {
-    toast.dismiss();
-
-    try {
-      const data = await api.post<RegisterResponse>('/auth/register', {
-        email: values.email,
-        password: values.password,
-        name: values.name || undefined,
-        phone: values.phone || undefined,
-      });
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('accessToken', data.accessToken);
-      }
-
-      toast.success('Registration successful. You are now logged in.');
-      reset({ ...values, password: '' });
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Registration failed';
-      toast.error(message);
-    }
-  };
+  } = form;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
@@ -76,11 +16,11 @@ export default function RegisterPage() {
         <h1 className="mb-6 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
           Create your account
         </h1>
-        <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Email</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="email"
@@ -96,8 +36,8 @@ export default function RegisterPage() {
 
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Password</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="password"

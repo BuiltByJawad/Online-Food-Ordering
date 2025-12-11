@@ -1,219 +1,50 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-
-interface Address {
-  id: string;
-  label: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  postalCode?: string;
-  country: string;
-  lat?: number;
-  lng?: number;
-  isDefault: boolean;
-}
-
-const schema = z.object({
-  label: z.string().min(1, 'Label is required').max(64, 'Label is too long'),
-  line1: z
-    .string()
-    .min(1, 'Address line 1 is required')
-    .max(255, 'Address line 1 is too long'),
-  line2: z.string().max(255, 'Address line 2 is too long').optional().or(z.literal('')),
-  city: z.string().min(1, 'City is required').max(128, 'City is too long'),
-  postalCode: z
-    .string()
-    .max(32, 'Postal code is too long')
-    .optional()
-    .or(z.literal('')),
-  country: z
-    .string()
-    .min(1, 'Country is required')
-    .max(64, 'Country is too long'),
-  lat: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || !Number.isNaN(Number(val)),
-      'Latitude must be a number',
-    ),
-  lng: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || !Number.isNaN(Number(val)),
-      'Longitude must be a number',
-    ),
-  isDefault: z.boolean().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { useAddresses } from '../hooks';
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { addresses, loading, form, handleSubmit, deleteAddress, makeDefault } =
+    useAddresses();
 
   const {
     register,
-    handleSubmit,
-    reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      label: '',
-      line1: '',
-      line2: '',
-      city: '',
-      postalCode: '',
-      country: '',
-      lat: '',
-      lng: '',
-      isDefault: false,
-    },
-  });
-
-  const loadAddresses = () => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      setLoading(false);
-      return;
-    }
-
-    api
-      .get<Address[]>('/addresses', token)
-      .then((data) => {
-        setAddresses(data);
-      })
-      .catch((err: unknown) => {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load addresses';
-        toast.error(message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    loadAddresses();
-  }, []);
-
-  const onSubmit = async (values: FormValues) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.post<Address>(
-        '/addresses',
-        {
-          label: values.label,
-          line1: values.line1,
-          line2: values.line2 || undefined,
-          city: values.city,
-          postalCode: values.postalCode || undefined,
-          country: values.country,
-          lat: values.lat ? Number(values.lat) : undefined,
-          lng: values.lng ? Number(values.lng) : undefined,
-          isDefault: values.isDefault ?? false,
-        },
-        token,
-      );
-
-      reset({
-        label: '',
-        line1: '',
-        line2: '',
-        city: '',
-        postalCode: '',
-        country: '',
-        lat: '',
-        lng: '',
-        isDefault: false,
-      });
-
-      toast.success('Address added.');
-      loadAddresses();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to add address';
-      toast.error(message);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.delete<void>(`/addresses/${id}`, token);
-      toast.success('Address deleted.');
-      loadAddresses();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to delete address';
-      toast.error(message);
-    }
-  };
-
-  const handleMakeDefault = async (id: string) => {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('accessToken')
-        : null;
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.patch<Address>(
-        `/addresses/${id}`,
-        { isDefault: true },
-        token,
-      );
-      toast.success('Default address updated.');
-      loadAddresses();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to update address';
-      toast.error(message);
-    }
-  };
+  } = form;
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
-          Loading addresses...
-        </p>
+      <div className="flex min-h-screen items-start justify-center bg-zinc-50 px-4 py-8 dark:bg-black">
+        <div className="w-full max-w-2xl space-y-4 rounded-xl bg-white p-8 shadow-md dark:bg-zinc-900">
+          <div className="h-6 w-40 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <div className="h-4 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <div className="h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-9 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="h-9 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800 md:col-span-2" />
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <div className="h-4 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            <div className="space-y-2">
+              <div className="h-4 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-4 w-40 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -226,13 +57,13 @@ export default function AddressesPage() {
         </h1>
         <form
           className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2"
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={handleSubmit}
           noValidate
         >
           <div className="md:col-span-1">
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Label</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
@@ -248,8 +79,8 @@ export default function AddressesPage() {
 
           <div className="md:col-span-1">
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>City</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
@@ -313,8 +144,8 @@ export default function AddressesPage() {
 
           <div>
             <label className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              <span className="text-red-600">*</span>
               <span>Country</span>
+              <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
@@ -378,9 +209,10 @@ export default function AddressesPage() {
           <div className="md:col-span-2 flex justify-end">
             <button
               type="submit"
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              disabled={isSubmitting}
+              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              Add address
+              {isSubmitting ? 'Adding address...' : 'Add address'}
             </button>
           </div>
         </form>
@@ -425,7 +257,7 @@ export default function AddressesPage() {
                 {!address.isDefault && (
                   <button
                     type="button"
-                    onClick={() => handleMakeDefault(address.id)}
+                    onClick={() => makeDefault(address.id)}
                     className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
                   >
                     Make default
@@ -433,7 +265,7 @@ export default function AddressesPage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => handleDelete(address.id)}
+                  onClick={() => deleteAddress(address.id)}
                   className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
                 >
                   Delete

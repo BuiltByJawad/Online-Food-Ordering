@@ -6,7 +6,13 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AddressesModule } from './addresses/addresses.module';
+<<<<<<< HEAD
 import { MenuModule } from './menu/menu.module';
+=======
+import { VendorsModule } from './vendors/vendors.module';
+import { MenuModule } from './menu/menu.module';
+import { OrdersModule } from './orders/orders.module';
+>>>>>>> fd897c04ea83262b56abf608b5aae4be4db3f547
 
 @Module({
   imports: [
@@ -31,7 +37,13 @@ import { MenuModule } from './menu/menu.module';
     UsersModule,
     AuthModule,
     AddressesModule,
+<<<<<<< HEAD
     MenuModule,
+=======
+    VendorsModule,
+    MenuModule,
+    OrdersModule,
+>>>>>>> fd897c04ea83262b56abf608b5aae4be4db3f547
   ],
   controllers: [AppController],
   providers: [AppService],
