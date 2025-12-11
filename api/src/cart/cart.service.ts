@@ -23,18 +23,25 @@ export class CartService {
       where: { userId, menuItemId: dto.menuItemId },
     });
 
+    const unitPrice = Number(item.basePrice);
+    const branchId =
+      dto.branchId ??
+      (item.category && item.category.branch ? item.category.branch.id : null) ??
+      null;
+
     if (existing) {
       existing.quantity += dto.quantity;
-      existing.unitPrice = item.price;
+      existing.unitPrice = unitPrice;
+      existing.branchId = branchId;
       return this.cartRepository.save(existing);
     }
 
     const created = this.cartRepository.create({
       userId,
-      branchId: dto.branchId ?? item.branchId ?? null,
+      branchId,
       menuItemId: dto.menuItemId,
       quantity: dto.quantity,
-      unitPrice: item.price,
+      unitPrice,
     });
     return this.cartRepository.save(created);
   }
