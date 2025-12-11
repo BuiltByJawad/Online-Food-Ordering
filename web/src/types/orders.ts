@@ -39,6 +39,7 @@ export interface Order {
   totalAmount: number;
   status: string;
   createdAt: string;
+  updatedAt?: string;
   branchId?: string | null;
   deliveryAddress?: OrderDeliveryAddressSnapshot | null;
   rider?: OrderRider | null;
