@@ -189,6 +189,20 @@ export class MenuService {
     return this.itemsRepository.save(item);
   }
 
+  async findOne(id: string) {
+    return this.itemsRepository.findOne({ where: { id } });
+  }
+
+  async findAll(branchId?: string) {
+    if (branchId) {
+      return this.itemsRepository.find({
+        where: { category: { branch: { id: branchId } }, isAvailable: true },
+        order: { name: 'ASC' },
+      });
+    }
+    return this.itemsRepository.find({ where: { isAvailable: true }, order: { name: 'ASC' } });
+  }
+
   private async getItemWithBranchOwner(itemId: string): Promise<MenuItem> {
     const item = await this.itemsRepository.findOne({
       where: { id: itemId },
