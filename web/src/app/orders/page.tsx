@@ -205,7 +205,7 @@ export default function OrdersPage() {
                 key={order.id}
                 className="space-y-2 rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-700"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                       Order
@@ -213,13 +213,20 @@ export default function OrdersPage() {
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {order.id}
                     </p>
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                      Placed on{' '}
-                      {new Date(order.createdAt).toLocaleString(undefined, {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+                        Placed {new Date(order.createdAt).toLocaleString(undefined, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                      </span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-semibold dark:bg-zinc-800">
+                        {renderStatusBadge(order.status)}
+                      </span>
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50">
+                        ৳ {order.totalAmount.toFixed(2)}
+                      </span>
+                    </div>
                     {order.branchId && (
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
                         {branchLabels[order.branchId]
@@ -249,15 +256,6 @@ export default function OrdersPage() {
                         </p>
                       </div>
                     )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      Status
-                    </p>
-                    <div className="mt-1">{renderStatusBadge(order.status)}</div>
-                    <p className="mt-1 text-xs font-semibold text-zinc-900 dark:text-zinc-50">
-                      {`৳ ${order.totalAmount.toFixed(2)}`}
-                    </p>
                   </div>
                 </div>
 

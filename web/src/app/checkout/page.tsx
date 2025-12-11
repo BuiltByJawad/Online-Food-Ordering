@@ -22,6 +22,11 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
   const hasItems = items.length > 0;
+  const loginRequired = addressAuthRequired;
+  const addressRequired = !loginRequired && addresses.length > 0;
+  const hasSelectedAddress = !!selectedAddressId;
+  const canConfirm =
+    hasItems && !submitting && !loginRequired && (!addressRequired || hasSelectedAddress);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -63,7 +68,13 @@ export default function CheckoutPage() {
 
     const token = getAccessToken();
     if (!token) {
+      setError('Please sign in to place an order.');
       router.push('/auth/login');
+      return;
+    }
+
+    if (addressRequired && !selectedAddressId) {
+      setError('Please select a delivery address.');
       return;
     }
 
@@ -200,10 +211,16 @@ export default function CheckoutPage() {
             )}
 
             {!addressLoading && addressAuthRequired && (
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Sign in to choose a saved delivery address, or continue to
-                enter one later.
-              </p>
+              <div className="space-y-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-100">
+                <p className="font-medium">Sign in to choose a saved delivery address.</p>
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/login')}
+                  className="rounded-md bg-amber-900 px-3 py-1.5 text-[11px] font-medium text-amber-50 hover:bg-amber-800 dark:bg-amber-200 dark:text-amber-900 dark:hover:bg-amber-100"
+                >
+                  Go to login
+                </button>
+              </div>
             )}
 
             {!addressLoading && !addressAuthRequired && addressError && (
@@ -283,7 +300,7 @@ export default function CheckoutPage() {
 
           <button
             type="button"
-            disabled={!hasItems || submitting}
+            disabled={!canConfirm}
             onClick={handleConfirm}
             className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 md:w-auto"
           >
@@ -293,6 +310,15 @@ export default function CheckoutPage() {
               ? 'Order placed'
               : 'Confirm order'}
           </button>
+          {!canConfirm && hasItems && (
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 md:text-right">
+              {loginRequired
+                ? 'Sign in to place your order.'
+                : addressRequired && !hasSelectedAddress
+                ? 'Select a delivery address to place your order.'
+                : 'Unable to place order right now.'}
+            </p>
+          )}
         </div>
       </div>
     </div>
