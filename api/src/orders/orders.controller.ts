@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -30,9 +39,18 @@ export class OrdersController {
     return this.ordersService.findForRider(user.userId);
   }
 
+  @Get('admin')
+  @Roles(UserRole.ADMIN)
+  findAllForAdmin() {
+    return this.ordersService.findAll();
+  }
+
   @Get('branch/:branchId')
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
-  findForBranch(@Param('branchId') branchId: string, @CurrentUser() user: any) {
+  findForBranch(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.ordersService.findForBranchManagedBy(branchId, {
       userId: user.userId,
       role: user.role,
@@ -42,7 +60,7 @@ export class OrdersController {
   @Patch(':orderId/status')
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   updateStatus(
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: UpdateOrderStatusDto,
     @CurrentUser() user: any,
   ) {
@@ -55,7 +73,7 @@ export class OrdersController {
   @Patch(':orderId/assign-rider')
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   assignRider(
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: AssignRiderDto,
     @CurrentUser() user: any,
   ) {
@@ -68,7 +86,7 @@ export class OrdersController {
   @Patch(':orderId/rider-status')
   @Roles(UserRole.RIDER)
   updateStatusForRider(
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: UpdateOrderStatusDto,
     @CurrentUser() user: any,
   ) {

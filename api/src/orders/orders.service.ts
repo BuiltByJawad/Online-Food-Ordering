@@ -119,6 +119,13 @@ export class OrdersService {
     return branch;
   }
 
+  async findAll(): Promise<Order[]> {
+    return this.ordersRepository.find({
+      order: { createdAt: 'DESC' },
+      relations: ['rider'],
+    });
+  }
+
   private assertCanManageBranch(branch: Branch, user: CurrentUserPayload): void {
     if (user.role === UserRole.ADMIN) {
       return;
