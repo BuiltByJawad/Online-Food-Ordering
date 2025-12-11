@@ -106,6 +106,18 @@ export default function ProfilePage() {
             My orders
           </a>
         </p>
+
+        {profile?.role === 'rider' && (
+          <p className="mt-1 text-center text-sm text-zinc-600 dark:text-zinc-400">
+            Manage your deliveries in{' '}
+            <a
+              href="/rider/orders"
+              className="font-medium text-zinc-900 underline dark:text-zinc-100"
+            >
+              Rider portal
+            </a>
+          </p>
+        )}
       </div>
     </div>
   );

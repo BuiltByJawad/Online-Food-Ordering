@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart';
 import { api } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import type { CreateOrderPayload } from '@/types/orders';
+import type { Address } from '@/types/api';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -14,7 +15,46 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [addressAuthRequired, setAddressAuthRequired] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+
   const hasItems = items.length > 0;
+
+  useEffect(() => {
+    const token = getAccessToken();
+
+    if (!token) {
+      setAddressAuthRequired(true);
+      setAddressLoading(false);
+      return;
+    }
+
+    setAddressLoading(true);
+    setAddressError(null);
+
+    api
+      .get<Address[]>('/addresses', token)
+      .then((data) => {
+        const list = data ?? [];
+        setAddresses(list);
+
+        if (list.length > 0) {
+          const def = list.find((a) => a.isDefault) ?? list[0];
+          setSelectedAddressId(def.id);
+        } else {
+          setSelectedAddressId(null);
+        }
+      })
+      .catch((err: any) => {
+        setAddressError(err?.message ?? 'Failed to load addresses');
+      })
+      .finally(() => {
+        setAddressLoading(false);
+      });
+  }, []);
 
   const handleConfirm = async () => {
     if (!hasItems || submitting) {
@@ -34,6 +74,7 @@ export default function CheckoutPage() {
       const payload: CreateOrderPayload = {
         items: items.map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
         ...(branchId ? { branchId } : {}),
+        ...(selectedAddressId ? { addressId: selectedAddressId } : {}),
       };
 
       await api.post('/orders', payload, token);
@@ -136,10 +177,98 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-            <div className="h-4 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-8 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="space-y-3 rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-700">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-zinc-800 dark:text-zinc-100">
+                Delivery address
+              </span>
+              <button
+                type="button"
+                onClick={() => router.push('/profile/addresses')}
+                className="text-xs text-zinc-600 underline hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                Manage
+              </button>
+            </div>
+
+            {addressLoading && (
+              <div className="space-y-2">
+                <div className="h-4 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-10 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-10 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              </div>
+            )}
+
+            {!addressLoading && addressAuthRequired && (
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Sign in to choose a saved delivery address, or continue to
+                enter one later.
+              </p>
+            )}
+
+            {!addressLoading && !addressAuthRequired && addressError && (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {addressError}
+              </p>
+            )}
+
+            {!addressLoading &&
+              !addressAuthRequired &&
+              !addressError &&
+              addresses.length === 0 && (
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  You have no saved addresses yet. Use the Address Book to add
+                  one.
+                </p>
+              )}
+
+            {!addressLoading &&
+              !addressAuthRequired &&
+              !addressError &&
+              addresses.length > 0 && (
+                <div className="space-y-2">
+                  {addresses.map((address) => (
+                    <label
+                      key={address.id}
+                      className={`flex cursor-pointer items-start justify-between gap-2 rounded-md border px-3 py-2 text-xs ${
+                        selectedAddressId === address.id
+                          ? 'border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-900'
+                          : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-500'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="radio"
+                          name="deliveryAddress"
+                          value={address.id}
+                          checked={selectedAddressId === address.id}
+                          onChange={() => setSelectedAddressId(address.id)}
+                          className="mt-0.5 h-3.5 w-3.5 border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-600 dark:bg-zinc-900"
+                        />
+                        <div>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                            {address.label}
+                          </p>
+                          <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                            {address.line1}
+                            {address.line2 ? `, ${address.line2}` : ''}
+                          </p>
+                          <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                            {address.city}
+                            {address.postalCode ? ` ${address.postalCode}` : ''}
+                            {address.country ? `, ${address.country}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {address.isDefault && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-100">
+                          Default
+                        </span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
           </div>
         </div>
 

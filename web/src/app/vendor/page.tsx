@@ -561,6 +561,13 @@ export default function VendorDashboardPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => router.push(`/vendor/branches/${branch.id}/orders`)}
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-900 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                >
+                  View orders
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setEditingBranch(branch);
                   }}

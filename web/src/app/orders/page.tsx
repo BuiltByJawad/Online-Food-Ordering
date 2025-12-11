@@ -15,7 +15,7 @@ interface BranchPublicInfo {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { orders, loading, error } = useOrders();
+  const { orders, loading, error, reload } = useOrders();
 
   const [branchLabels, setBranchLabels] = useState<Record<string, string>>({});
 
@@ -79,6 +79,46 @@ export default function OrdersPage() {
     };
   }, [branchIds]);
 
+  const renderStatusBadge = (status: string) => {
+    const base =
+      'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium';
+    let colors =
+      'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100';
+
+    switch (status) {
+      case 'created':
+        colors =
+          'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100';
+        break;
+      case 'accepted':
+        colors =
+          'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
+        break;
+      case 'preparing':
+        colors =
+          'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
+        break;
+      case 'completed':
+        colors =
+          'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100';
+        break;
+      case 'cancelled':
+        colors =
+          'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
+        break;
+      default:
+        break;
+    }
+
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+
+    return (
+      <span className={`${base} ${colors}`} aria-label={`Status: ${label}`}>
+        {label}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
@@ -115,13 +155,22 @@ export default function OrdersPage() {
               View the orders you have placed with this account.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Back home
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => reload()}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Back home
+            </button>
+          </div>
         </div>
 
         {authRequired && (
@@ -178,14 +227,34 @@ export default function OrdersPage() {
                           : `Branch ID: ${order.branchId}`}
                       </p>
                     )}
+                    {order.deliveryAddress && (
+                      <div className="mt-1 space-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                        <p className="font-medium text-zinc-700 dark:text-zinc-300">
+                          Delivery address
+                        </p>
+                        <p>
+                          {order.deliveryAddress.line1}
+                          {order.deliveryAddress.line2
+                            ? `, ${order.deliveryAddress.line2}`
+                            : ''}
+                        </p>
+                        <p>
+                          {order.deliveryAddress.city}
+                          {order.deliveryAddress.postalCode
+                            ? ` ${order.deliveryAddress.postalCode}`
+                            : ''}
+                          {order.deliveryAddress.country
+                            ? `, ${order.deliveryAddress.country}`
+                            : ''}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                       Status
                     </p>
-                    <p className="text-sm font-medium capitalize text-zinc-900 dark:text-zinc-50">
-                      {order.status}
-                    </p>
+                    <div className="mt-1">{renderStatusBadge(order.status)}</div>
                     <p className="mt-1 text-xs font-semibold text-zinc-900 dark:text-zinc-50">
                       {`৳ ${order.totalAmount.toFixed(2)}`}
                     </p>
