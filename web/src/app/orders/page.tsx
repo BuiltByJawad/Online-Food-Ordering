@@ -220,6 +220,14 @@ export default function OrdersPage() {
                           timeStyle: 'short',
                         })}
                       </span>
+                      {order.updatedAt && (
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+                          Updated {new Date(order.updatedAt).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </span>
+                      )}
                       <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-semibold dark:bg-zinc-800">
                         {renderStatusBadge(order.status)}
                       </span>
