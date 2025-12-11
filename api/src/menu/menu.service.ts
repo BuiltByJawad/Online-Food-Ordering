@@ -190,7 +190,10 @@ export class MenuService {
   }
 
   async findOne(id: string) {
-    return this.itemsRepository.findOne({ where: { id } });
+    return this.itemsRepository.findOne({
+      where: { id },
+      relations: ['category', 'category.branch'],
+    });
   }
 
   async findAll(branchId?: string) {
