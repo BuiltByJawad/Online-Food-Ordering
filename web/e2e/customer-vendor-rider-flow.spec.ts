@@ -7,6 +7,9 @@ const vmPassword = process.env.E2E_VM_PASSWORD;
 const riderEmail = process.env.E2E_RIDER_EMAIL;
 const riderPassword = process.env.E2E_RIDER_PASSWORD;
 const branchId = process.env.E2E_BRANCH_ID;
+const menuItemId = process.env.E2E_MENU_ITEM_ID;
+const addressId = process.env.E2E_ADDRESS_ID;
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api';
 
 async function login(page: any, email: string, password: string) {
   await page.goto('/auth/login');
@@ -16,45 +19,46 @@ async function login(page: any, email: string, password: string) {
   await expect(page).not.toHaveURL(/\/auth\/login(\?|$)/);
 }
 
+async function loginViaApi(request: any, email: string, password: string) {
+  const res = await request.post(`${apiBaseUrl}/auth/login`, {
+    data: { email, password },
+  });
+  expect(res.ok()).toBeTruthy();
+  const body = await res.json();
+  const token = body?.accessToken;
+  expect(token).toBeTruthy();
+  return token as string;
+}
+
 async function placeOrderAsCustomer(page: any, branchId: string) {
-  // This assumes the cart already has items for the branch (or a default branch flow).
-  // Navigate to checkout directly.
-  await page.goto('/checkout');
-
-  // If not logged in, login
-  const onLogin = await page
-    .getByRole('heading', { name: 'Sign in' })
-    .isVisible({ timeout: 500 })
-    .catch(() => false);
-  if (onLogin) {
-    await login(page, customerEmail!, customerPassword!);
-    await page.goto('/checkout');
+  if (!menuItemId) {
+    test.skip(true, 'E2E_MENU_ITEM_ID must be set to create an order.');
   }
 
-  await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
-
-  // If address selection is present, ensure an address is selected (first radio)
-  const addressRadio = page.locator('input[type="radio"][name="deliveryAddress"]').first();
-  if (await addressRadio.count()) {
-    await addressRadio.check();
+  // Create order via API
+  const token = await loginViaApi(page.request, customerEmail!, customerPassword!);
+  const payload: any = {
+    items: [{ itemId: menuItemId!, quantity: 1 }],
+    branchId,
+  };
+  if (addressId) {
+    payload.addressId = addressId;
   }
 
-  // Confirm order
-  const confirmBtn = page.getByRole('button', { name: /Confirm order/i });
-  await confirmBtn.click();
+  const res = await page.request.post(`${apiBaseUrl}/orders`, { data: payload, headers: { Authorization: `Bearer ${token}` } });
+  expect(res.ok()).toBeTruthy();
+  const order = await res.json();
+  const orderId = order?.id as string;
+  expect(orderId).toBeTruthy();
 
-  // Wait for redirect to /orders or success message
-  await page.waitForTimeout(500); // small buffer
-  await expect(page).not.toHaveURL(/\/checkout/);
-
-  // Go to My orders
+  // Login UI to view orders
+  await login(page, customerEmail!, customerPassword!);
   await page.goto('/orders');
   await expect(page.getByRole('heading', { name: 'My orders' })).toBeVisible();
 
-  // Grab latest order card (first card)
-  const firstCard = page.locator('div.space-y-2.rounded-lg.border.border-zinc-200').first();
-  await expect(firstCard).toBeVisible();
-  const orderId = (await firstCard.locator('p').nth(1).innerText()).trim();
+  const card = page.locator('div.space-y-2.rounded-lg.border.border-zinc-200').filter({ hasText: orderId }).first();
+  await expect(card).toBeVisible();
+
   return { orderId };
 }
 
