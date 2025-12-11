@@ -23,6 +23,10 @@ export class UsersService {
     return this.usersRepository.save(entity);
   }
 
+  findAll(): Promise<User[]> {
+    return this.usersRepository.find({ order: { createdAt: 'DESC' } });
+  }
+
   async updateProfile(
     id: string,
     data: Partial<Pick<User, 'name' | 'phone'>>,
@@ -31,6 +35,15 @@ export class UsersService {
     const updated = await this.findById(id);
     if (!updated) {
       throw new Error('User not found after update');
+    }
+    return updated;
+  }
+
+  async updateRole(id: string, role: User['role']): Promise<User> {
+    await this.usersRepository.update(id, { role });
+    const updated = await this.findById(id);
+    if (!updated) {
+      throw new Error('User not found after role update');
     }
     return updated;
   }

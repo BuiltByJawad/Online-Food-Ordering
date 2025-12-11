@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { getAccessToken } from '@/lib/auth';
+import { getAccessToken, fetchCurrentUser } from '@/lib/auth';
 import type { Order, OrderStatus } from '@/types/orders';
 
-interface UseBranchOrdersResult {
+interface UseRiderOrdersResult {
   loading: boolean;
   error: string | null;
   orders: Order[];
@@ -16,7 +16,7 @@ interface UseBranchOrdersResult {
   updateStatus: (orderId: string, status: OrderStatus) => Promise<void>;
 }
 
-export function useBranchOrders(branchId: string): UseBranchOrdersResult {
+export function useRiderOrders(): UseRiderOrdersResult {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -36,10 +36,19 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
     setError(null);
 
     try {
-      const data = await api.get<Order[]>(`/orders/branch/${branchId}`, token);
+      const current = await fetchCurrentUser(token);
+
+      if (current.role !== 'rider') {
+        toast.error('You do not have access to the rider portal.');
+        router.replace('/');
+        return;
+      }
+
+      const data = await api.get<Order[]>('/orders/rider', token);
       setOrders(data ?? []);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load orders';
+      const message =
+        err instanceof Error ? err.message : 'Failed to load rider orders';
       setError(message);
     } finally {
       setLoading(false);
@@ -48,7 +57,7 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
 
   useEffect(() => {
     void load();
-  }, [branchId]);
+  }, []);
 
   const updateStatus = async (orderId: string, status: OrderStatus) => {
     const token = getAccessToken();
@@ -67,7 +76,7 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
 
     try {
       const updated = await api.patch<Order>(
-        `/orders/${orderId}/status`,
+        `/orders/${orderId}/rider-status`,
         { status },
         token,
       );
@@ -75,10 +84,10 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
       setOrders((prev) =>
         prev.map((order) => (order.id === updated.id ? updated : order)),
       );
-      toast.success('Order status updated.');
+      toast.success('Delivery status updated.');
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Failed to update order status';
+        err instanceof Error ? err.message : 'Failed to update delivery status';
       toast.error(message);
     } finally {
       setUpdatingIds((prev) => {

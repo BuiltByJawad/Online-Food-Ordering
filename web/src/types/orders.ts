@@ -20,6 +20,13 @@ export interface OrderDeliveryAddressSnapshot {
   country: string;
 }
 
+export type OrderStatus =
+  | 'created'
+  | 'accepted'
+  | 'preparing'
+  | 'completed'
+  | 'cancelled';
+
 export interface Order {
   id: string;
   items: OrderItemLine[];

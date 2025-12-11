@@ -16,6 +16,9 @@ export class Order {
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   user: User;
 
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  rider: User | null;
+
   @Column({ type: 'uuid', nullable: true })
   branchId: string | null;
 

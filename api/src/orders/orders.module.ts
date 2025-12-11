@@ -6,9 +6,10 @@ import { Order } from './order.entity';
 import { MenuItem } from '../menu/menu-item.entity';
 import { Address } from '../addresses/address.entity';
 import { Branch } from '../vendors/branch.entity';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, MenuItem, Address, Branch])],
+  imports: [TypeOrmModule.forFeature([Order, MenuItem, Address, Branch]), UsersModule],
   controllers: [OrdersController],
   providers: [OrdersService],
 })
