@@ -11,12 +11,13 @@ import {
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { CreateOrderDto } from './dto/create-order.dto';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../users/user-role.enum';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { AssignRiderDto } from './dto/assign-rider.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { UserRole } from '../users/user-role.enum';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { Query } from '@nestjs/common';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -57,6 +58,17 @@ export class OrdersController {
     });
   }
 
+  @Get('branch/:branchId/analytics')
+  @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
+  getBranchAnalytics(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @CurrentUser() user: any,
+    @Query('days') days?: string,
+  ) {
+    const window = days ? parseInt(days, 10) : 7;
+    return this.ordersService.getBranchAnalytics(branchId, { userId: user.userId, role: user.role }, window);
+  }
+
   @Patch(':orderId/status')
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   updateStatus(
@@ -91,6 +103,28 @@ export class OrdersController {
     @CurrentUser() user: any,
   ) {
     return this.ordersService.updateStatusForRider(orderId, dto.status, {
+      userId: user.userId,
+      role: user.role,
+    });
+  }
+
+  @Post(':orderId/payment-intent')
+  createPaymentIntent(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.ordersService.createPaymentIntent(orderId, {
+      userId: user.userId,
+      role: user.role,
+    });
+  }
+
+  @Post(':orderId/payment-intent/confirm')
+  confirmPaymentIntent(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.ordersService.confirmPaymentIntent(orderId, {
       userId: user.userId,
       role: user.role,
     });

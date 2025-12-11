@@ -47,6 +47,9 @@ export class Order {
   @Column({ type: 'varchar', length: 32, default: 'created' })
   status: string;
 
+  @Column({ type: 'varchar', length: 32, default: 'unpaid' })
+  paymentStatus: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -50,3 +50,9 @@ export interface CreateOrderPayload {
   branchId?: string | null;
   addressId?: string | null;
 }
+
+export interface BranchAnalytics {
+  ordersPerDay: Array<{ date: string; count: number }>;
+  revenuePerDay: Array<{ date: string; total: number }>;
+  topItems: Array<{ name: string; quantity: number; amount: number }>;
+}

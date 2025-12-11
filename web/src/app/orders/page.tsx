@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useOrders } from './hooks';
+import type { OrderStatus } from '@/types/orders';
 
 interface BranchPublicInfo {
   id: string;
@@ -78,6 +79,61 @@ export default function OrdersPage() {
       isActive = false;
     };
   }, [branchIds]);
+
+  const statusSteps: OrderStatus[] = ['created', 'accepted', 'preparing', 'completed'];
+
+  const renderTimeline = (status: string) => {
+    if (status === 'cancelled') {
+      return (
+        <div className="mt-2 flex items-center gap-2 text-[11px] text-rose-700 dark:text-rose-200">
+          <span className="h-2 w-2 rounded-full bg-rose-500" />
+          <span>Order was cancelled</span>
+        </div>
+      );
+    }
+
+    const activeIndex = statusSteps.findIndex((s) => s === status);
+
+    return (
+      <div className="mt-2 flex items-center gap-3">
+        {statusSteps.map((step, index) => {
+          const isActive = activeIndex >= index;
+          const isCurrent = activeIndex === index;
+          return (
+            <div key={step} className="flex items-center gap-1 text-[11px]">
+              <span
+                className={`h-3 w-3 rounded-full border ${
+                  isActive
+                    ? 'border-emerald-500 bg-emerald-500'
+                    : 'border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900'
+                } ${isCurrent ? 'ring-2 ring-emerald-200 dark:ring-emerald-900/40' : ''}`}
+                aria-label={step}
+                title={step}
+              />
+              <span
+                className={`capitalize ${
+                  isActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-zinc-500 dark:text-zinc-400'
+                }`}
+              >
+                {step}
+              </span>
+              {index < statusSteps.length - 1 && (
+                <span className="mx-1 h-px w-6 bg-zinc-300 dark:bg-zinc-700" aria-hidden="true" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderEta = (status: string) => {
+    if (status === 'cancelled') return 'No delivery — order cancelled';
+    if (status === 'completed') return 'Delivered';
+    if (status === 'preparing') return 'ETA ~15-25 min (prep in progress)';
+    if (status === 'accepted') return 'ETA ~20-30 min (accepted by vendor)';
+    return 'Awaiting vendor acceptance';
+  };
 
   const renderStatusBadge = (status: string) => {
     const base =
@@ -242,6 +298,10 @@ export default function OrdersPage() {
                           : `Branch ID: ${order.branchId}`}
                       </p>
                     )}
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                      {renderEta(order.status)}
+                    </p>
+                    {renderTimeline(order.status)}
                     {order.deliveryAddress && (
                       <div className="mt-1 space-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
                         <p className="font-medium text-zinc-700 dark:text-zinc-300">
