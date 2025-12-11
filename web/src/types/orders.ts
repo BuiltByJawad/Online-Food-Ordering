@@ -27,6 +27,12 @@ export type OrderStatus =
   | 'completed'
   | 'cancelled';
 
+export interface OrderRider {
+  id: string;
+  email?: string;
+  name?: string;
+}
+
 export interface Order {
   id: string;
   items: OrderItemLine[];
@@ -35,6 +41,7 @@ export interface Order {
   createdAt: string;
   branchId?: string | null;
   deliveryAddress?: OrderDeliveryAddressSnapshot | null;
+  rider?: OrderRider | null;
 }
 
 export interface CreateOrderPayload {

@@ -313,6 +313,7 @@ describe('OrdersService', () => {
       expect(ordersRepository.find).toHaveBeenCalledWith({
         where: { branchId },
         order: { createdAt: 'DESC' },
+        relations: ['rider'],
       });
       expect(result).toBe(orders);
     });
