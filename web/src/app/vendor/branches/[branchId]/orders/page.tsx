@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { useBranchOrders, type OrderStatus } from './hooks';
+import { getAccessToken } from '@/lib/auth';
+import { useBranchOrders } from './hooks';
+import type { OrderStatus } from '@/types/orders';
+import type { User } from '@/types/api';
 
 interface BranchOrdersPageProps {
   params: {
@@ -30,9 +34,13 @@ const STATUS_OPTIONS: OrderStatus[] = [
 export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
   const { branchId } = params;
   const router = useRouter();
-  const { orders, loading, error, updatingIds, updateStatus, reload } =
+  const { orders, loading, error, updatingIds, updateStatus, reload, assignRider } =
     useBranchOrders(branchId);
   const [branchLabel, setBranchLabel] = useState<string | null>(null);
+  const [riderSearchQuery, setRiderSearchQuery] = useState('');
+  const [riderSearchLoading, setRiderSearchLoading] = useState(false);
+  const [riderResults, setRiderResults] = useState<User[]>([]);
+  const [selectedRiders, setSelectedRiders] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -56,6 +64,35 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
       active = false;
     };
   }, [branchId]);
+
+  const searchRiders = async () => {
+    const token = getAccessToken();
+
+    if (!token) {
+      toast.error('You are not logged in.');
+      router.replace('/auth/login');
+      return;
+    }
+
+    setRiderSearchLoading(true);
+
+    try {
+      const query = riderSearchQuery.trim();
+      const url = query.length
+        ? `/users/riders?q=${encodeURIComponent(query)}`
+        : '/users/riders';
+      const data = await api.get<User[]>(url, token);
+      setRiderResults(data ?? []);
+      if (!data || data.length === 0) {
+        toast.message('No riders found for that search.');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to search riders';
+      toast.error(message);
+    } finally {
+      setRiderSearchLoading(false);
+    }
+  };
 
   const hasOrders = orders.length > 0;
 
@@ -120,6 +157,39 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
           </div>
         )}
 
+        {!error && (
+          <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Find riders
+              </div>
+              <input
+                type="text"
+                value={riderSearchQuery}
+                onChange={(event) => setRiderSearchQuery(event.target.value)}
+                placeholder="Search by rider email"
+                className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              />
+              <button
+                type="button"
+                onClick={() => void searchRiders()}
+                disabled={riderSearchLoading}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                {riderSearchLoading ? 'Searching...' : 'Search riders'}
+              </button>
+              {riderResults.length > 0 && (
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {riderResults.length} result{riderResults.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              Search riders by email, then select per order below.
+            </p>
+          </div>
+        )}
+
         {!error && !hasOrders && (
           <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
             No orders have been placed for this branch yet.
@@ -130,6 +200,7 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
           <div className="space-y-4">
             {orders.map((order) => {
               const isUpdating = updatingIds.has(order.id);
+              const selectedRiderId = selectedRiders[order.id] ?? '';
 
               return (
                 <div
@@ -190,6 +261,10 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
                       <div className="text-right text-xs font-semibold text-zinc-900 dark:text-zinc-50">
                         ৳ {order.totalAmount.toFixed(2)}
                       </div>
+                      <div className="text-right text-[11px] text-zinc-600 dark:text-zinc-400">
+                        <span className="font-semibold">Rider:</span>{' '}
+                        {order.rider?.email || order.rider?.id || 'Unassigned'}
+                      </div>
                       <select
                         value={order.status}
                         disabled={isUpdating}
@@ -204,6 +279,42 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
                           </option>
                         ))}
                       </select>
+                      <div className="mt-2 flex items-center gap-2">
+                        <select
+                          value={selectedRiderId}
+                          onChange={(event) =>
+                            setSelectedRiders((prev) => ({
+                              ...prev,
+                              [order.id]: event.target.value,
+                            }))
+                          }
+                          className="w-52 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                        >
+                          <option value="">Select rider</option>
+                          {riderResults.map((rider) => (
+                            <option key={rider.id} value={rider.id}>
+                              {rider.email}
+                              {rider.name ? ` — ${rider.name}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedRiderId.trim()) {
+                              toast.error('Select a rider before assigning.');
+                              return;
+                            }
+                            void (async () => {
+                              await assignRider(order.id, selectedRiderId.trim());
+                              await reload();
+                            })();
+                          }}
+                          className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                        >
+                          Assign rider
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

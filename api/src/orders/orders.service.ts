@@ -144,6 +144,7 @@ export class OrdersService {
     return this.ordersRepository.find({
       where: { branchId },
       order: { createdAt: 'DESC' },
+      relations: ['rider'],
     });
   }
 

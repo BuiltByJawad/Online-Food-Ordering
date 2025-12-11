@@ -14,6 +14,7 @@ interface UseBranchOrdersResult {
   updatingIds: Set<string>;
   reload: () => Promise<void>;
   updateStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  assignRider: (orderId: string, riderUserId: string) => Promise<void>;
 }
 
 export function useBranchOrders(branchId: string): UseBranchOrdersResult {
@@ -43,6 +44,29 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const assignRider = async (orderId: string, riderUserId: string) => {
+    const token = getAccessToken();
+
+    if (!token) {
+      toast.error('You are not logged in.');
+      router.replace('/auth/login');
+      return;
+    }
+
+    try {
+      await api.patch<unknown>(
+        `/orders/${orderId}/assign-rider`,
+        { riderUserId },
+        token,
+      );
+      toast.success('Rider assigned.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to assign rider';
+      toast.error(message);
     }
   };
 
@@ -96,5 +120,6 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
     updatingIds,
     reload: load,
     updateStatus,
+    assignRider,
   };
 }

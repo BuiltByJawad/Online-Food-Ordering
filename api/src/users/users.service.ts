@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
+import { UserRole } from './user-role.enum';
 
 @Injectable()
 export class UsersService {
@@ -46,5 +47,21 @@ export class UsersService {
       throw new Error('User not found after role update');
     }
     return updated;
+  }
+
+  async findRiders(query?: string): Promise<User[]> {
+    const qb = this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.RIDER })
+      .orderBy('user.createdAt', 'DESC')
+      .select(['user.id', 'user.email', 'user.name', 'user.role']);
+
+    if (query && query.trim().length > 0) {
+      qb.andWhere('LOWER(user.email) LIKE :q', {
+        q: `%${query.toLowerCase()}%`,
+      });
+    }
+
+    return qb.getMany();
   }
 }

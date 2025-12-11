@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -26,10 +27,10 @@ export class CreateOrderDto {
   items: OrderItemDto[];
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   branchId?: string;
 
    @IsOptional()
-   @IsString()
+   @IsUUID()
    addressId?: string;
 }
