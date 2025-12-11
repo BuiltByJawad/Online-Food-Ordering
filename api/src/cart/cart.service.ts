@@ -26,8 +26,8 @@ export class CartService {
     const unitPrice = Number(item.basePrice);
     const branchId =
       dto.branchId ??
-      (item.category && item.category.branch ? item.category.branch.id : null) ??
-      null;
+      // item.category?.branch?.id will be present if menuService.findOne loads relations
+      ((item as any)?.category?.branch?.id ?? null);
 
     if (existing) {
       existing.quantity += dto.quantity;

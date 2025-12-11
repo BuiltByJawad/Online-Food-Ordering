@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -19,6 +20,7 @@ export class MenuItem {
     nullable: false,
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'category_id' })
   category: MenuCategory;
 
   @Column({ type: 'varchar', length: 255 })
