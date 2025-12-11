@@ -321,9 +321,9 @@ Each workflow below can be turned into concrete user stories, backend/DB tasks, 
 - **NFR-REL-002** System shall implement automatic retries for transient external API failures with backoff.
 - **NFR-REL-003** System shall implement database backup and recovery procedures with at least daily full backups and point‑in‑time recovery where supported.
 
-### 8.3 Security (ISO 27001, OWASP Top 10)
+### 8.3 Security & Privacy (ISO 27001, OWASP)
 
-- **NFR-SEC-001** All external communication shall use HTTPS/TLS.
+- **NFR-SEC-001** All API endpoints shall enforce authentication and authorization using JWT access tokens with refresh token rotation.
 - **NFR-SEC-002** The system shall implement input validation and output encoding to prevent injection attacks (SQLi, XSS). Use ORM parameter binding and validation pipes in NestJS.
 - **NFR-SEC-003** The system shall implement CSRF protection for browser‑based flows as appropriate (e.g., same‑site cookies or CSRF tokens).
 - **NFR-SEC-004** The system shall implement robust authentication and session management (token expiry, refresh rotation, revocation on logout and password change).
@@ -344,6 +344,49 @@ Each workflow below can be turned into concrete user stories, backend/DB tasks, 
 - **NFR-USE-002** Basic accessibility principles (WCAG 2.1 AA) shall be followed: keyboard navigation, focus states, semantic HTML, sufficient contrast.
 
 ### 8.6 Quality Management (ISO 9001/90003)
+
+---
+
+## 9. Production-Grade Operational Requirements (Addendum)
+
+### 9.1 Performance, Availability, and DR
+- **NFR-PA-001** Define SLOs for critical APIs (e.g., p95 latency targets per route group) and service uptime targets; track via observability stack.
+- **NFR-PA-002** HA database deployment with replicas; nightly backups with tested restores; documented RPO/RTO and restore drills at least quarterly.
+- **NFR-PA-003** Planned maintenance windows and migration playbooks (including rollback).
+
+### 9.2 Observability
+- **NFR-OBS-001** Structured logging with correlation IDs; redact PII/secrets in logs.
+- **NFR-OBS-002** Metrics for requests/latency/errors (by route), DB/queue health, payments/notifications success-fail, and business KPIs (orders, revenue).
+- **NFR-OBS-003** Distributed tracing for API calls and async workers.
+- **NFR-OBS-004** Dashboards and alerts with on-call runbooks for auth, orders, payments, notifications, and DB health.
+
+### 9.3 Security Hardening
+- **NFR-SEC-009** Rate limiting per IP/account for auth and sensitive flows; captcha/step-up on abuse signals.
+- **NFR-SEC-010** Secrets and keys managed via secure store (no secrets in source); key rotation policy.
+- **NFR-SEC-011** Audit trails for admin/support actions and order/payment state transitions; tamper-resistant storage.
+- **NFR-SEC-012** Session revocation on logout/password change; strict HSTS/CSP; secure cookies; CSRF protection where applicable.
+- **NFR-SEC-013** PII classification with retention/deletion policies; user data access/delete workflows (GDPR/CCPA); PCI alignment (no PAN storage; use PSP tokens).
+
+### 9.4 API Governance
+- **NFR-API-001** OpenAPI/Swagger definitions must be generated and versioned in CI; breaking changes require version bumps.
+- **NFR-API-002** Idempotency keys for POST/PATCH that mutate orders/payments/notifications; explicit rate limits documented per route group.
+- **NFR-API-003** Error taxonomy with stable codes/messages; client-facing docs kept in sync.
+
+### 9.5 Delivery & Rollout
+- **NFR-REL-001** Feature flags for risky changes; support canary/blue-green deployments.
+- **NFR-REL-002** Database migrations are forward-compatible; rollback steps documented and tested.
+
+### 9.6 Data & Compliance
+- **NFR-COMP-001** Backup/restore drills scheduled and recorded; evidence for audits.
+- **NFR-COMP-002** Data residency/sovereignty requirements documented (if applicable) and enforced at storage level.
+- **NFR-COMP-003** Fraud/abuse monitoring for suspicious orders, promo brute-force, and auth abuse.
+
+### 9.7 Product Completeness Gaps to Implement
+- **NFR-PROD-001** Real payments integration with provider, webhooks, reconciliation, refunds, payouts.
+- **NFR-PROD-002** Real notifications (email/SMS/push) with provider logging and retries; in-app real-time updates (WebSockets or SSE).
+- **NFR-PROD-003** Promotions/coupons/loyalty; ratings/reviews flows; admin/support consoles and reporting.
+- **NFR-PROD-004** Accessibility hardening (WCAG 2.1 AA) audits; responsive verification across breakpoints.
+- **NFR-PROD-005** Comprehensive tests (unit/integration/E2E) and staging environment parity; Playwright E2E runs gated in CI.
 
 - **NFR-QUAL-001** Requirements shall be traceable from this SRS to implementation tasks and test cases.
 - **NFR-QUAL-002** Changes to requirements or code shall follow a defined change control process (issue tracking, code review, approval, deployment).

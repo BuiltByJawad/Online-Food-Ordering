@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -30,6 +30,7 @@ const STATUS_OPTIONS: OrderStatus[] = [
   'completed',
   'cancelled',
 ];
+const PER_PAGE = 10;
 
 export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
   const { branchId } = params;
@@ -41,6 +42,8 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
   const [riderSearchLoading, setRiderSearchLoading] = useState(false);
   const [riderResults, setRiderResults] = useState<User[]>([]);
   const [selectedRiders, setSelectedRiders] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -95,6 +98,58 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
   };
 
   const hasOrders = orders.length > 0;
+  const filteredOrders = useMemo(() => {
+    const base = statusFilter === 'all'
+      ? orders
+      : orders.filter((o) => o.status === statusFilter);
+    return base;
+  }, [orders, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * PER_PAGE,
+    currentPage * PER_PAGE,
+  );
+
+  const exportCsv = () => {
+    if (filteredOrders.length === 0) {
+      toast.message('No orders to export.');
+      return;
+    }
+    const header = [
+      'orderId',
+      'status',
+      'totalAmount',
+      'createdAt',
+      'branchId',
+      'rider',
+      'itemsCount',
+    ];
+    const rows = filteredOrders.map((order) => [
+      order.id,
+      order.status,
+      order.totalAmount.toString(),
+      order.createdAt,
+      order.branchId ?? '',
+      order.rider?.email ?? order.rider?.id ?? '',
+      order.items.length.toString(),
+    ]);
+    const lines = [header, ...rows]
+      .map((cols) =>
+        cols
+          .map((val) => `"${String(val ?? '').replace(/"/g, '""')}"`)
+          .join(','),
+      )
+      .join('\n');
+    const blob = new Blob([lines], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `branch-${branchId}-orders.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderStatusBadge = (status: OrderStatus) => {
     const palette: Record<OrderStatus, string> = {
@@ -207,18 +262,40 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
               Search riders by email, then select per order below.
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Filters
+              </div>
+              <select
+                value={statusFilter}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value as OrderStatus | 'all');
+                  setPage(1);
+                }}
+                className="w-40 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              >
+                <option value="all">All statuses</option>
+                {STATUS_OPTIONS.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={exportCsv}
+                disabled={filteredOrders.length === 0}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
         )}
 
-        {!error && !hasOrders && (
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
-            No orders have been placed for this branch yet.
-          </div>
-        )}
-
-        {!error && hasOrders && (
+        {!error && filteredOrders.length > 0 && (
           <div className="space-y-4">
-            {orders.map((order) => {
+            {paginatedOrders.map((order) => {
               const isUpdating = updatingIds.has(order.id);
               const selectedRiderId = selectedRiders[order.id] ?? '';
 
@@ -352,6 +429,29 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
                 </div>
               );
             })}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-md border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Prev
+                </button>
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-md border border-zinc-300 px-2 py-1 font-medium hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

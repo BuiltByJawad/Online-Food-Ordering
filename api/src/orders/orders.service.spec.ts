@@ -14,6 +14,7 @@ import { Address } from '../addresses/address.entity';
 import { Branch } from '../vendors/branch.entity';
 import { UserRole } from '../users/user-role.enum';
 import { UsersService } from '../users/users.service';
+import { OrdersNotificationsService } from './orders-notifications.service';
 
 const createOrderRepositoryMock = () => ({
   create: jest.fn(),
@@ -38,6 +39,11 @@ const createUsersServiceMock = () => ({
   findById: jest.fn(),
 }) as unknown as jest.Mocked<UsersService>;
 
+const createNotificationsServiceMock = () =>
+  ({
+    notifyStatusChange: jest.fn(),
+  }) as unknown as jest.Mocked<OrdersNotificationsService>;
+
 describe('OrdersService', () => {
   let service: OrdersService;
   let ordersRepository: jest.Mocked<Repository<Order>>;
@@ -45,6 +51,7 @@ describe('OrdersService', () => {
   let addressesRepository: jest.Mocked<Repository<Address>>;
   let branchesRepository: jest.Mocked<Repository<Branch>>;
   let usersService: jest.Mocked<UsersService>;
+  let notificationsService: jest.Mocked<OrdersNotificationsService>;
 
   beforeEach(async () => {
     ordersRepository = createOrderRepositoryMock();
@@ -52,6 +59,7 @@ describe('OrdersService', () => {
     addressesRepository = createAddressRepositoryMock();
     branchesRepository = createBranchRepositoryMock();
     usersService = createUsersServiceMock();
+    notificationsService = createNotificationsServiceMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -75,6 +83,10 @@ describe('OrdersService', () => {
         {
           provide: UsersService,
           useValue: usersService,
+        },
+        {
+          provide: OrdersNotificationsService,
+          useValue: notificationsService,
         },
       ],
     }).compile();

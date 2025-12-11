@@ -13,6 +13,9 @@ import { Branch } from '../vendors/branch.entity';
 import { UserRole } from '../users/user-role.enum';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UsersService } from '../users/users.service';
+import { OrdersNotificationsService } from './orders-notifications.service';
+import { PaymentsService } from '../payments/payments.service';
+import { AuditService } from '../audit/audit.service';
 interface CurrentUserPayload {
   userId: string;
   role: UserRole;
@@ -30,6 +33,9 @@ export class OrdersService {
     @InjectRepository(Branch)
     private readonly branchesRepository: Repository<Branch>,
     private readonly usersService: UsersService,
+    private readonly ordersNotificationsService: OrdersNotificationsService,
+    private readonly paymentsService: PaymentsService,
+    private readonly auditService: AuditService,
   ) {}
 
   async createForUser(userId: string, dto: CreateOrderDto): Promise<Order> {
@@ -85,6 +91,7 @@ export class OrdersService {
       items: lines,
       totalAmount: total,
       status: 'created',
+      paymentStatus: 'unpaid',
       branchId,
       deliveryAddress,
     });
@@ -155,6 +162,76 @@ export class OrdersService {
     });
   }
 
+  async getBranchAnalytics(
+    branchId: string,
+    user: CurrentUserPayload,
+    days = 7,
+  ): Promise<{
+    ordersPerDay: Array<{ date: string; count: number }>;
+    revenuePerDay: Array<{ date: string; total: number }>;
+    topItems: Array<{ name: string; quantity: number; amount: number }>;
+  }> {
+    const branch = await this.getBranchWithOwner(branchId);
+    this.assertCanManageBranch(branch, user);
+
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (days - 1));
+
+    const ordersPerDay = await this.ordersRepository
+      .createQueryBuilder('order')
+      .select("to_char(order.createdAt, 'YYYY-MM-DD')", 'date')
+      .addSelect('COUNT(*)', 'count')
+      .where('order.branchId = :branchId', { branchId })
+      .andWhere('order.createdAt >= :start', { start })
+      .groupBy("to_char(order.createdAt, 'YYYY-MM-DD')")
+      .orderBy("to_char(order.createdAt, 'YYYY-MM-DD')", 'ASC')
+      .getRawMany();
+
+    const revenuePerDay = await this.ordersRepository
+      .createQueryBuilder('order')
+      .select("to_char(order.createdAt, 'YYYY-MM-DD')", 'date')
+      .addSelect('SUM(order.totalAmount)', 'total')
+      .where('order.branchId = :branchId', { branchId })
+      .andWhere('order.createdAt >= :start', { start })
+      .groupBy("to_char(order.createdAt, 'YYYY-MM-DD')")
+      .orderBy("to_char(order.createdAt, 'YYYY-MM-DD')", 'ASC')
+      .getRawMany();
+
+    const topItems = await this.ordersRepository.query(
+      `
+        SELECT
+          item->>'name' AS name,
+          SUM((item->>'quantity')::int) AS quantity,
+          SUM((item->>'quantity')::int * (item->>'basePrice')::numeric) AS amount
+        FROM "order" o
+        CROSS JOIN LATERAL jsonb_array_elements(o.items) AS item
+        WHERE o."branchId" = $1
+          AND o."createdAt" >= $2
+        GROUP BY item->>'name'
+        ORDER BY quantity DESC
+        LIMIT 5
+      `,
+      [branchId, start],
+    );
+
+    return {
+      ordersPerDay: ordersPerDay.map((row) => ({
+        date: row.date,
+        count: Number(row.count),
+      })),
+      revenuePerDay: revenuePerDay.map((row) => ({
+        date: row.date,
+        total: Number(row.total),
+      })),
+      topItems: topItems.map((row: any) => ({
+        name: row.name,
+        quantity: Number(row.quantity),
+        amount: Number(row.amount),
+      })),
+    };
+  }
+
   async updateStatusForBranchManagedBy(
     orderId: string,
     status: string,
@@ -162,6 +239,7 @@ export class OrdersService {
   ): Promise<Order> {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },
+      relations: ['rider', 'user'],
     });
 
     if (!order) {
@@ -175,8 +253,20 @@ export class OrdersService {
     const branch = await this.getBranchWithOwner(order.branchId);
     this.assertCanManageBranch(branch, user);
 
+    const beforeStatus = order.status;
     order.status = status;
-    return this.ordersRepository.save(order);
+    const saved = await this.ordersRepository.save(order);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'order.status.update',
+      entityType: 'order',
+      entityId: order.id,
+      before: { status: beforeStatus },
+      after: { status },
+    });
+    await this.ordersNotificationsService.notifyStatusChange(saved);
+    return saved;
   }
 
   async assignRiderForBranchManagedBy(
@@ -209,8 +299,19 @@ export class OrdersService {
       throw new BadRequestException('User is not a rider');
     }
 
+    const beforeRiderId = order.rider?.id ?? null;
     order.rider = rider;
-    return this.ordersRepository.save(order);
+    const saved = await this.ordersRepository.save(order);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'order.assignRider',
+      entityType: 'order',
+      entityId: order.id,
+      before: { riderId: beforeRiderId },
+      after: { riderId: rider.id },
+    });
+    return saved;
   }
 
   async updateStatusForRider(
@@ -220,7 +321,7 @@ export class OrdersService {
   ): Promise<Order> {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },
-      relations: ['rider'],
+      relations: ['rider', 'user'],
     });
 
     if (!order) {
@@ -231,7 +332,41 @@ export class OrdersService {
       throw new ForbiddenException('You do not have access to this order');
     }
 
+    const beforeStatus = order.status;
     order.status = status;
-    return this.ordersRepository.save(order);
+    const saved = await this.ordersRepository.save(order);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'order.riderStatus.update',
+      entityType: 'order',
+      entityId: order.id,
+      before: { status: beforeStatus },
+      after: { status },
+    });
+    await this.ordersNotificationsService.notifyStatusChange(saved);
+    return saved;
+  }
+
+  async createPaymentIntent(
+    orderId: string,
+    user: CurrentUserPayload,
+  ): Promise<{
+    clientSecret: string;
+    amount: number;
+    currency: string;
+    paymentStatus: string;
+  }> {
+    return this.paymentsService.createPaymentIntent(orderId, user);
+  }
+
+  async confirmPaymentIntent(
+    orderId: string,
+    user: CurrentUserPayload,
+  ): Promise<{
+    status: 'succeeded';
+    paymentStatus: string;
+  }> {
+    return this.paymentsService.confirmPaymentIntent(orderId, user);
   }
 }

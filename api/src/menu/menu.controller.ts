@@ -1,26 +1,3 @@
-<<<<<<< HEAD
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { MenuService } from './menu.service';
-import { CreateMenuItemDto } from './dto/create-menu-item.dto';
-import { ParseUUIDPipe } from '@nestjs/common';
-
-@Controller('menu-items')
-export class MenuController {
-  constructor(private readonly menuService: MenuService) {}
-
-  @Get()
-  list(@Query('branchId') branchId?: string) {
-    if (branchId) {
-      // validate UUID if provided
-      new ParseUUIDPipe().transform(branchId, { type: 'query', data: 'branchId' });
-    }
-    return this.menuService.findAll(branchId);
-  }
-
-  @Post()
-  create(@Body() dto: CreateMenuItemDto) {
-    return this.menuService.create(dto);
-=======
 import {
   Body,
   Controller,
@@ -30,6 +7,7 @@ import {
   Patch,
   Post,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { MenuService } from './menu.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -49,12 +27,12 @@ export class MenuController {
   constructor(private readonly menuService: MenuService) {}
 
   @Get('branches/:branchId/menu')
-  getBranchMenu(@Param('branchId') branchId: string) {
+  getBranchMenu(@Param('branchId', ParseUUIDPipe) branchId: string) {
     return this.menuService.getBranchMenu(branchId);
   }
 
   @Get('branches/:branchId/info')
-  getBranchInfo(@Param('branchId') branchId: string) {
+  getBranchInfo(@Param('branchId', ParseUUIDPipe) branchId: string) {
     return this.menuService.getBranchPublicInfo(branchId);
   }
 
@@ -62,7 +40,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   createCategory(
-    @Param('branchId') branchId: string,
+    @Param('branchId', ParseUUIDPipe) branchId: string,
     @Body() dto: CreateMenuCategoryDto,
     @CurrentUser() user: any,
   ) {
@@ -70,7 +48,7 @@ export class MenuController {
   }
 
   @Get('branches/:branchId/menu-categories')
-  getCategories(@Param('branchId') branchId: string) {
+  getCategories(@Param('branchId', ParseUUIDPipe) branchId: string) {
     return this.menuService.getCategoriesForBranch(branchId);
   }
 
@@ -78,7 +56,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   updateCategory(
-    @Param('categoryId') categoryId: string,
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
     @Body() dto: UpdateMenuCategoryDto,
     @CurrentUser() user: any,
   ) {
@@ -89,7 +67,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   deleteCategory(
-    @Param('categoryId') categoryId: string,
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
     @CurrentUser() user: any,
   ) {
     return this.menuService.deleteCategory(categoryId, user);
@@ -99,7 +77,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   createItem(
-    @Param('categoryId') categoryId: string,
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
     @Body() dto: CreateMenuItemDto,
     @CurrentUser() user: any,
   ) {
@@ -110,7 +88,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   updateItem(
-    @Param('itemId') itemId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: UpdateMenuItemDto,
     @CurrentUser() user: any,
   ) {
@@ -120,7 +98,10 @@ export class MenuController {
   @Delete('menu-items/:itemId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
-  deleteItem(@Param('itemId') itemId: string, @CurrentUser() user: any) {
+  deleteItem(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.menuService.deleteItem(itemId, user);
   }
 
@@ -128,7 +109,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   createOption(
-    @Param('itemId') itemId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: CreateMenuOptionDto,
     @CurrentUser() user: any,
   ) {
@@ -139,7 +120,7 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   updateOption(
-    @Param('optionId') optionId: string,
+    @Param('optionId', ParseUUIDPipe) optionId: string,
     @Body() dto: UpdateMenuOptionDto,
     @CurrentUser() user: any,
   ) {
@@ -150,10 +131,9 @@ export class MenuController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   deleteOption(
-    @Param('optionId') optionId: string,
+    @Param('optionId', ParseUUIDPipe) optionId: string,
     @CurrentUser() user: any,
   ) {
     return this.menuService.deleteOption(optionId, user);
->>>>>>> fd897c04ea83262b56abf608b5aae4be4db3f547
   }
 }
