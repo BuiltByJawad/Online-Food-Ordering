@@ -56,17 +56,32 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
       return;
     }
 
+    setUpdatingIds((prev) => {
+      const next = new Set(prev);
+      next.add(orderId);
+      return next;
+    });
+
     try {
-      await api.patch<unknown>(
+      const updated = await api.patch<Order>(
         `/orders/${orderId}/assign-rider`,
         { riderUserId },
         token,
+      );
+      setOrders((prev) =>
+        prev.map((order) => (order.id === updated.id ? updated : order)),
       );
       toast.success('Rider assigned.');
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Failed to assign rider';
       toast.error(message);
+    } finally {
+      setUpdatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
     }
   };
 

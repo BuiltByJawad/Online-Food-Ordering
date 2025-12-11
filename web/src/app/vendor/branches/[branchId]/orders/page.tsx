@@ -96,6 +96,26 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
 
   const hasOrders = orders.length > 0;
 
+  const renderStatusBadge = (status: OrderStatus) => {
+    const palette: Record<OrderStatus, string> = {
+      created: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-100',
+      accepted: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-100',
+      preparing:
+        'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-100',
+      completed:
+        'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100',
+      cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-100',
+    };
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${palette[status]}`}
+      >
+        {status}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-start justify-center bg-zinc-50 px-4 py-8 dark:bg-black">
@@ -254,16 +274,27 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
                         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                           Status
                         </p>
-                        <p className="text-sm font-medium capitalize text-zinc-900 dark:text-zinc-50">
-                          {order.status}
-                        </p>
+                        <div className="mt-1 flex items-center justify-end gap-2">
+                          {renderStatusBadge(order.status as OrderStatus)}
+                          {isUpdating && (
+                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                              Updating…
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right text-xs font-semibold text-zinc-900 dark:text-zinc-50">
                         ৳ {order.totalAmount.toFixed(2)}
                       </div>
                       <div className="text-right text-[11px] text-zinc-600 dark:text-zinc-400">
                         <span className="font-semibold">Rider:</span>{' '}
-                        {order.rider?.email || order.rider?.id || 'Unassigned'}
+                        {order.rider?.email || order.rider?.id ? (
+                          order.rider.email || order.rider.id
+                        ) : (
+                          <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                            Unassigned
+                          </span>
+                        )}
                       </div>
                       <select
                         value={order.status}
@@ -310,9 +341,10 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
                               await reload();
                             })();
                           }}
-                          className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                          disabled={isUpdating || riderSearchLoading || !selectedRiderId.trim()}
+                          className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
                         >
-                          Assign rider
+                          {isUpdating ? 'Assigning…' : 'Assign rider'}
                         </button>
                       </div>
                     </div>
