@@ -1,11 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import { getAccessToken, fetchCurrentUser } from '@/lib/auth';
-import type { BranchAnalytics } from '@/types/orders';
+import { useMemo } from 'react';
+import { useBranchAnalytics } from './hooks/useBranchAnalytics';
 
 interface BranchAnalyticsPageProps {
   params: {
@@ -13,65 +9,12 @@ interface BranchAnalyticsPageProps {
   };
 }
 
-interface BranchPublicInfo {
-  id: string;
-  name: string;
-  city: string;
-  country: string;
-  vendorName: string | null;
-}
-
 const DAY_WINDOWS = [7, 14, 30] as const;
 
 export default function BranchAnalyticsPage({ params }: BranchAnalyticsPageProps) {
   const { branchId } = params;
-  const router = useRouter();
-
-  const [loading, setLoading] = useState(true);
-  const [branchLabel, setBranchLabel] = useState<string | null>(null);
-  const [analytics, setAnalytics] = useState<BranchAnalytics | null>(null);
-  const [dayWindow, setDayWindow] = useState<typeof DAY_WINDOWS[number]>(7);
-
-  const loadData = async (days: number) => {
-    const token = getAccessToken();
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      router.replace('/auth/login');
-      return;
-    }
-
-    try {
-      const user = await fetchCurrentUser(token);
-      if (user.role !== 'vendor_manager' && user.role !== 'admin') {
-        toast.error('You do not have access to the vendor portal.');
-        router.replace('/');
-        return;
-      }
-
-      const info = await api.get<BranchPublicInfo>(`/branches/${branchId}/info`);
-      const vendorPrefix =
-        info.vendorName && info.vendorName !== info.name ? `${info.vendorName} - ` : '';
-      const citySuffix = info.city ? ` (${info.city})` : '';
-      setBranchLabel(`${vendorPrefix}${info.name}${citySuffix}`);
-
-      const data = await api.get<BranchAnalytics>(
-        `/orders/branch/${branchId}/analytics?days=${days}`,
-        token,
-      );
-      setAnalytics(data);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load analytics';
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData(dayWindow);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchId, dayWindow]);
+  const { loading, branchLabel, analytics, dayWindow, setDayWindow } =
+    useBranchAnalytics(branchId);
 
   const totals = useMemo(() => {
     if (!analytics) {
@@ -106,10 +49,7 @@ export default function BranchAnalyticsPage({ params }: BranchAnalyticsPageProps
             {DAY_WINDOWS.map((d) => (
               <button
                 key={d}
-                onClick={() => {
-                  setLoading(true);
-                  setDayWindow(d);
-                }}
+                onClick={() => setDayWindow(d)}
                 className={`rounded-md px-3 py-1 text-xs font-semibold ${
                   dayWindow === d
                     ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900'

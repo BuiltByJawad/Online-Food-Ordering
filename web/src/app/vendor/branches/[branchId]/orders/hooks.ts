@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import {
   createOrdersSocket,
@@ -12,6 +11,11 @@ import {
   type OrderRiderAssignedEvent,
 } from '@/lib/realtime';
 import type { Order, OrderStatus } from '@/types/orders';
+import {
+  fetchBranchOrders,
+  updateBranchOrderStatus,
+  assignBranchOrderRider,
+} from './services/orders';
 
 interface UseBranchOrdersResult {
   loading: boolean;
@@ -31,8 +35,9 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
   const prevStatusRef = useRef<Record<string, string>>({});
   const socketRef = useRef<OrdersSocket | null>(null);
+  const cache = useRef<Order[] | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const token = getAccessToken();
 
     if (!token) {
@@ -45,15 +50,20 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
     setError(null);
 
     try {
-      const data = await api.get<Order[]>(`/orders/branch/${branchId}`, token);
-      setOrders(data ?? []);
+      if (cache.current) {
+        setOrders(cache.current);
+      }
+      const data = await fetchBranchOrders(branchId, token);
+      const list = data ?? [];
+      cache.current = list;
+      setOrders(list);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load orders';
       setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [branchId, router]);
 
   const assignRider = async (orderId: string, riderUserId: string) => {
     const token = getAccessToken();
@@ -71,11 +81,7 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
     });
 
     try {
-      const updated = await api.patch<Order>(
-        `/orders/${orderId}/assign-rider`,
-        { riderUserId },
-        token,
-      );
+      const updated = await assignBranchOrderRider(orderId, riderUserId, token);
       setOrders((prev) =>
         prev.map((order) => (order.id === updated.id ? updated : order)),
       );
@@ -117,23 +123,26 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
           statusMap[o.id] = o.status;
         });
         prevStatusRef.current = statusMap;
+        cache.current = next;
         return next;
       });
     });
 
     socket.on('order.rider.assigned', (payload: OrderRiderAssignedEvent) => {
-      setOrders((prev) =>
-        prev.map((o) =>
+      setOrders((prev) => {
+        const next = prev.map((o) =>
           o.id === payload.orderId ? { ...o, rider: payload.riderId ? { id: payload.riderId } : null } : o,
-        ),
-      );
+        );
+        cache.current = next;
+        return next;
+      });
       toast.message(`Order ${payload.orderId} assigned to rider`);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [branchId]);
+  }, [branchId, load]);
 
   const updateStatus = async (orderId: string, status: OrderStatus) => {
     const token = getAccessToken();
@@ -151,15 +160,12 @@ export function useBranchOrders(branchId: string): UseBranchOrdersResult {
     });
 
     try {
-      const updated = await api.patch<Order>(
-        `/orders/${orderId}/status`,
-        { status },
-        token,
-      );
+      const updated = await updateBranchOrderStatus(orderId, status, token);
 
       setOrders((prev) =>
         prev.map((order) => (order.id === updated.id ? updated : order)),
       );
+      cache.current = null;
       toast.success('Order status updated.');
     } catch (err: unknown) {
       const message =

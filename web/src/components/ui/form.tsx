@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef } from 'react';
-import { FieldError, FieldErrorsImpl, Merge } from 'react-hook-form';
+import type { FieldError, FieldErrorsImpl, FieldValues, Merge } from 'react-hook-form';
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -10,7 +10,7 @@ function cn(...classes: Array<string | false | null | undefined>) {
 type BaseProps = {
   label?: string;
   required?: boolean;
-  error?: FieldError | Merge<FieldError, FieldErrorsImpl<any>> | string;
+  error?: FieldError | Merge<FieldError, FieldErrorsImpl<FieldValues>> | string;
   hint?: string;
   className?: string;
 };
@@ -25,7 +25,7 @@ export const FormField = forwardRef<
       : (error as FieldError | undefined)?.message;
 
   return (
-    <div ref={ref as any} className={cn('flex flex-col gap-1', className)}>
+    <div ref={ref as React.RefObject<HTMLDivElement>} className={cn('flex flex-col gap-1', className)}>
       {label && (
         <label className="flex items-center justify-between text-xs font-medium text-zinc-700 dark:text-zinc-200">
           <span className="flex items-center gap-1">

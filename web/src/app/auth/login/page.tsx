@@ -11,7 +11,7 @@ export default function LoginPage() {
       subtitle="Welcome back. Access your account to manage orders and promotions."
       footer={
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link
             href="/auth/register"
             className="font-medium text-zinc-900 underline dark:text-zinc-100"

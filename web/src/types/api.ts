@@ -48,8 +48,8 @@ export interface Branch {
   lat?: number;
   lng?: number;
   status: string;
-  openingHours?: Record<string, any>;
-  deliveryZones?: Record<string, any>;
+  openingHours?: Record<string, unknown>;
+  deliveryZones?: Record<string, unknown>;
 }
 
 export interface MenuOption {
@@ -69,7 +69,7 @@ export interface MenuItem {
   basePrice: number | string;
   taxCategory?: string | null;
   isAvailable: boolean;
-  availabilitySchedule?: Record<string, any> | null;
+  availabilitySchedule?: Record<string, unknown> | null;
   options: MenuOption[];
 }
 

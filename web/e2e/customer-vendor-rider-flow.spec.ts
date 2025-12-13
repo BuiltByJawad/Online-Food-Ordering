@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect } from '@playwright/test';
 
 const customerEmail = process.env.E2E_CUSTOMER_EMAIL;
