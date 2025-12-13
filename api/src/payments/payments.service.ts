@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from './payment.entity';
@@ -13,6 +13,9 @@ interface CurrentUserPayload {
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+  private readonly idempotencyCache = new Map<string, any>();
+
   constructor(
     @InjectRepository(Payment)
     private readonly paymentsRepository: Repository<Payment>,
@@ -20,6 +23,10 @@ export class PaymentsService {
     private readonly ordersRepository: Repository<Order>,
     private readonly auditService: AuditService,
   ) {}
+
+  private makeCacheKey(kind: 'intent' | 'confirm', orderId: string, userId: string, idempotencyKey?: string) {
+    return idempotencyKey ? `${kind}:${orderId}:${userId}:${idempotencyKey}` : null;
+  }
 
   private assertCanAccessOrder(order: Order, user: CurrentUserPayload) {
     if (user.role === UserRole.ADMIN) return;
@@ -30,6 +37,7 @@ export class PaymentsService {
   async createPaymentIntent(
     orderId: string,
     user: CurrentUserPayload,
+    idempotencyKey?: string,
   ): Promise<{
     paymentId: string;
     clientSecret: string;
@@ -37,6 +45,11 @@ export class PaymentsService {
     currency: string;
     paymentStatus: string;
   }> {
+    const cacheKey = this.makeCacheKey('intent', orderId, user.userId, idempotencyKey);
+    if (cacheKey && this.idempotencyCache.has(cacheKey)) {
+      return this.idempotencyCache.get(cacheKey);
+    }
+
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },
       relations: ['user'],
@@ -74,22 +87,34 @@ export class PaymentsService {
       },
     });
 
-    return {
+    const response = {
       paymentId: saved.id,
       clientSecret: `mock_client_secret_${saved.id}`,
       amount: Number(order.totalAmount),
       currency: 'USD',
       paymentStatus: order.paymentStatus,
     };
+
+    if (cacheKey) {
+      this.idempotencyCache.set(cacheKey, response);
+    }
+
+    return response;
   }
 
   async confirmPaymentIntent(
     orderId: string,
     user: CurrentUserPayload,
+    idempotencyKey?: string,
   ): Promise<{
     status: 'succeeded';
     paymentStatus: string;
   }> {
+    const cacheKey = this.makeCacheKey('confirm', orderId, user.userId, idempotencyKey);
+    if (cacheKey && this.idempotencyCache.has(cacheKey)) {
+      return this.idempotencyCache.get(cacheKey);
+    }
+
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },
       relations: ['user'],
@@ -110,6 +135,13 @@ export class PaymentsService {
       throw new NotFoundException('Payment not found for order');
     }
 
+    // idempotent confirm: if already succeeded, short-circuit
+    if (payment.status === 'succeeded' && order.paymentStatus === 'paid') {
+      const response = { status: 'succeeded' as const, paymentStatus: order.paymentStatus };
+      if (cacheKey) this.idempotencyCache.set(cacheKey, response);
+      return response;
+    }
+
     payment.status = 'succeeded';
     await this.paymentsRepository.save(payment);
 
@@ -125,9 +157,15 @@ export class PaymentsService {
       after: { status: 'succeeded', orderPaymentStatus: order.paymentStatus },
     });
 
-    return {
-      status: 'succeeded',
+    const response = {
+      status: 'succeeded' as const,
       paymentStatus: order.paymentStatus,
     };
+
+    if (cacheKey) {
+      this.idempotencyCache.set(cacheKey, response);
+    }
+
+    return response;
   }
 }

@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getAccessToken, fetchCurrentUser } from '@/lib/auth';
+import {
+  createOrdersSocket,
+  type OrdersSocket,
+  type OrderStatusUpdatedEvent,
+  type OrderRiderAssignedEvent,
+} from '@/lib/realtime';
 import type { Order, OrderStatus } from '@/types/orders';
 
 interface UseRiderOrdersResult {
@@ -22,6 +28,8 @@ export function useRiderOrders(): UseRiderOrdersResult {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+  const prevStatusRef = useRef<Record<string, string>>({});
+  const socketRef = useRef<OrdersSocket | null>(null);
 
   const load = async () => {
     const token = getAccessToken();
@@ -57,6 +65,43 @@ export function useRiderOrders(): UseRiderOrdersResult {
 
   useEffect(() => {
     void load();
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    const socket = createOrdersSocket(token);
+    socketRef.current = socket;
+
+    socket.on('order.status.updated', (payload: OrderStatusUpdatedEvent) => {
+      setOrders((prev) => {
+        const next = prev.map((o) =>
+          o.id === payload.orderId ? { ...o, status: payload.status, rider: o.rider } : o,
+        );
+        const prevStatus = prevStatusRef.current[payload.orderId];
+        if (prevStatus && prevStatus !== payload.status) {
+          const label = payload.status.charAt(0).toUpperCase() + payload.status.slice(1);
+          toast.message(`Order ${payload.orderId} is now ${label}`);
+        }
+        const statusMap: Record<string, string> = {};
+        next.forEach((o) => {
+          statusMap[o.id] = o.status;
+        });
+        prevStatusRef.current = statusMap;
+        return next;
+      });
+    });
+
+    socket.on('order.rider.assigned', (payload: OrderRiderAssignedEvent) => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === payload.orderId ? { ...o, rider: payload.riderId ? { id: payload.riderId } : null } : o,
+        ),
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const updateStatus = async (orderId: string, status: OrderStatus) => {

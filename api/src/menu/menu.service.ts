@@ -12,6 +12,7 @@ import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { CreateMenuOptionDto } from './dto/create-menu-option.dto';
 import { UpdateMenuOptionDto } from './dto/update-menu-option.dto';
 import { UserRole } from '../users/user-role.enum';
+import { AuditService } from '../audit/audit.service';
 
 interface CurrentUserPayload {
   userId: string;
@@ -29,6 +30,7 @@ export class MenuService {
     private readonly optionsRepository: Repository<MenuOption>,
     @InjectRepository(Branch)
     private readonly branchesRepository: Repository<Branch>,
+    private readonly auditService: AuditService,
   ) {}
 
   async getBranchMenu(branchId: string): Promise<MenuCategory[]> {
@@ -114,7 +116,16 @@ export class MenuService {
       sortOrder: dto.sortOrder ?? 0,
     });
 
-    return this.categoriesRepository.save(category);
+    const saved = await this.categoriesRepository.save(category);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.category.create',
+      entityType: 'menuCategory',
+      entityId: saved.id,
+      after: { branchId: branch.id, name: saved.name, sortOrder: saved.sortOrder },
+    });
+    return saved;
   }
 
   async getCategoriesForBranch(branchId: string): Promise<MenuCategory[]> {
@@ -148,8 +159,19 @@ export class MenuService {
     const category = await this.getCategoryWithBranchOwner(categoryId);
     this.assertCanManageBranch(category.branch, user);
 
+    const before = { name: category.name, sortOrder: category.sortOrder };
     Object.assign(category, dto);
-    return this.categoriesRepository.save(category);
+    const saved = await this.categoriesRepository.save(category);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.category.update',
+      entityType: 'menuCategory',
+      entityId: category.id,
+      before,
+      after: { name: saved.name, sortOrder: saved.sortOrder },
+    });
+    return saved;
   }
 
   async deleteCategory(categoryId: string, user: CurrentUserPayload): Promise<void> {
@@ -157,6 +179,14 @@ export class MenuService {
     this.assertCanManageBranch(category.branch, user);
 
     await this.categoriesRepository.delete(category.id);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.category.delete',
+      entityType: 'menuCategory',
+      entityId: category.id,
+      before: { name: category.name },
+    });
   }
 
   private async getCategoryForItemCreation(
@@ -186,7 +216,16 @@ export class MenuService {
       availabilitySchedule: dto.availabilitySchedule,
     });
 
-    return this.itemsRepository.save(item);
+    const saved = await this.itemsRepository.save(item);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.item.create',
+      entityType: 'menuItem',
+      entityId: saved.id,
+      after: { name: saved.name, categoryId: category.id, basePrice: saved.basePrice },
+    });
+    return saved;
   }
 
   async findOne(id: string) {
@@ -232,8 +271,27 @@ export class MenuService {
     const item = await this.getItemWithBranchOwner(itemId);
     this.assertCanManageBranch(item.category.branch, user);
 
+    const before = {
+      name: item.name,
+      basePrice: item.basePrice,
+      isAvailable: item.isAvailable,
+    };
     Object.assign(item, dto);
-    return this.itemsRepository.save(item);
+    const saved = await this.itemsRepository.save(item);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.item.update',
+      entityType: 'menuItem',
+      entityId: item.id,
+      before,
+      after: {
+        name: saved.name,
+        basePrice: saved.basePrice,
+        isAvailable: saved.isAvailable,
+      },
+    });
+    return saved;
   }
 
   async deleteItem(itemId: string, user: CurrentUserPayload): Promise<void> {
@@ -241,6 +299,14 @@ export class MenuService {
     this.assertCanManageBranch(item.category.branch, user);
 
     await this.itemsRepository.delete(item.id);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.item.delete',
+      entityType: 'menuItem',
+      entityId: item.id,
+      before: { name: item.name },
+    });
   }
 
   private async getItemForOptionCreation(
@@ -289,7 +355,16 @@ export class MenuService {
       maxSelection: dto.maxSelection,
     });
 
-    return this.optionsRepository.save(option);
+    const saved = await this.optionsRepository.save(option);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.option.create',
+      entityType: 'menuOption',
+      entityId: saved.id,
+      after: { itemId: item.id, name: saved.name, type: saved.type },
+    });
+    return saved;
   }
 
   async updateOption(
@@ -300,8 +375,19 @@ export class MenuService {
     const option = await this.getOptionWithBranchOwner(optionId);
     this.assertCanManageBranch(option.item.category.branch, user);
 
+    const before = { name: option.name, type: option.type, priceDelta: option.priceDelta };
     Object.assign(option, dto);
-    return this.optionsRepository.save(option);
+    const saved = await this.optionsRepository.save(option);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.option.update',
+      entityType: 'menuOption',
+      entityId: option.id,
+      before,
+      after: { name: saved.name, type: saved.type, priceDelta: saved.priceDelta },
+    });
+    return saved;
   }
 
   async deleteOption(optionId: string, user: CurrentUserPayload): Promise<void> {
@@ -309,5 +395,13 @@ export class MenuService {
     this.assertCanManageBranch(option.item.category.branch, user);
 
     await this.optionsRepository.delete(option.id);
+    await this.auditService.record({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'menu.option.delete',
+      entityType: 'menuOption',
+      entityId: option.id,
+      before: { name: option.name },
+    });
   }
 }

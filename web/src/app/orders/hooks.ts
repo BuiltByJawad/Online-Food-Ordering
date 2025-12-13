@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import {
+  createOrdersSocket,
+  type OrdersSocket,
+  type OrderStatusUpdatedEvent,
+  type OrderRiderAssignedEvent,
+} from '@/lib/realtime';
 import type { Order } from '@/types/orders';
 
 const POLL_INTERVAL_MS = 15_000;
@@ -13,6 +19,7 @@ export function useOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const prevStatusRef = useRef<Record<string, string>>({});
+  const socketRef = useRef<OrdersSocket | null>(null);
 
   const applyOrders = (next: Order[], { showToasts }: { showToasts: boolean }) => {
     if (showToasts) {
@@ -73,9 +80,40 @@ export function useOrders() {
       void fetchOrders(token, () => isActive, { showToasts: true }).catch(() => {});
     }, POLL_INTERVAL_MS);
 
+    const socket = createOrdersSocket(token);
+    socketRef.current = socket;
+    socket.on('order.status.updated', (payload: OrderStatusUpdatedEvent) => {
+      setOrders((prev) => {
+        const next = prev.map((o) =>
+          o.id === payload.orderId ? { ...o, status: payload.status, rider: o.rider } : o,
+        );
+        const prevStatus = prevStatusRef.current[payload.orderId];
+        if (prevStatus && prevStatus !== payload.status) {
+          const label = payload.status.charAt(0).toUpperCase() + payload.status.slice(1);
+          toast.message(`Order ${payload.orderId} is now ${label}`);
+        }
+        // update status map
+        const statusMap: Record<string, string> = {};
+        next.forEach((o) => {
+          statusMap[o.id] = o.status;
+        });
+        prevStatusRef.current = statusMap;
+        return next;
+      });
+    });
+    socket.on('order.rider.assigned', (payload: OrderRiderAssignedEvent) => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === payload.orderId ? { ...o, rider: payload.riderId ? { id: payload.riderId } : null } : o,
+        ),
+      );
+      toast.message(`Order ${payload.orderId} assigned to rider`);
+    });
+
     return () => {
       isActive = false;
       clearInterval(timer);
+      socket.disconnect();
     };
   }, []);
 

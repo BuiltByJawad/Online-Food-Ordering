@@ -14,11 +14,29 @@ import { CartModule } from './cart/cart.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AuditModule } from './audit/audit.module';
 import { LoggingInterceptor } from './common/logging.interceptor';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { PromotionsModule } from './promotions/promotions.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: (config) => {
+        const required = [
+          'JWT_ACCESS_SECRET',
+          'DB_HOST',
+          'DB_USER',
+          'DB_PASSWORD',
+          'DB_NAME',
+        ];
+        for (const key of required) {
+          if (!config[key]) {
+            throw new Error(`Missing required environment variable: ${key}`);
+          }
+        }
+        return config;
+      },
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -49,6 +67,9 @@ import { LoggingInterceptor } from './common/logging.interceptor';
     CartModule,
     PaymentsModule,
     AuditModule,
+    NotificationsModule,
+    ReviewsModule,
+    PromotionsModule,
   ],
   controllers: [AppController],
   providers: [

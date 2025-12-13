@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useOrders } from './hooks';
 import type { OrderStatus } from '@/types/orders';
+import { getAccessToken } from '@/lib/auth';
+import type { Review } from '@/types/reviews';
 
 interface BranchPublicInfo {
   id: string;
@@ -19,6 +21,13 @@ export default function OrdersPage() {
   const { orders, loading, error, reload } = useOrders();
 
   const [branchLabels, setBranchLabels] = useState<Record<string, string>>({});
+  const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
+  const [activeReview, setActiveReview] = useState<{
+    orderId: string;
+    rating: number;
+    comment: string;
+  } | null>(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const branchIds = useMemo(
     () =>
@@ -79,6 +88,62 @@ export default function OrdersPage() {
       isActive = false;
     };
   }, [branchIds]);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+    const completed = orders.filter((o) => o.status === 'completed');
+    const pendingFetch = completed.filter((o) => reviewed[o.id] === undefined);
+    if (pendingFetch.length === 0) return;
+
+    let isActive = true;
+    const load = async () => {
+      const results = await Promise.all(
+        pendingFetch.map((o) =>
+          api
+            .get<Review | null>(`/reviews/order/${o.id}`, token)
+            .then((r) => ({ id: o.id, hasReview: Boolean(r) }))
+            .catch(() => ({ id: o.id, hasReview: false })),
+        ),
+      );
+      if (!isActive) return;
+      setReviewed((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => {
+          next[r.id] = r.hasReview;
+        });
+        return next;
+      });
+    };
+    void load();
+    return () => {
+      isActive = false;
+    };
+  }, [orders, reviewed]);
+
+  const openReview = (orderId: string) => {
+    setActiveReview({ orderId, rating: 5, comment: '' });
+  };
+
+  const submitReview = async () => {
+    if (!activeReview) return;
+    const token = getAccessToken();
+    if (!token) {
+      router.push('/auth/login');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      await api.post('/reviews', activeReview, token);
+      setReviewed((prev) => ({ ...prev, [activeReview.orderId]: true }));
+      setActiveReview(null);
+      await reload();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const statusSteps: OrderStatus[] = ['created', 'accepted', 'preparing', 'completed'];
 
@@ -346,11 +411,115 @@ export default function OrdersPage() {
                       </p>
                     </div>
                   ))}
+                  {order.status === 'completed' && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {reviewed[order.id] ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
+                          ✓ Review submitted
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openReview(order.id)}
+                          className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-500"
+                        >
+                          Rate this order
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewModal({
+  draft,
+  onClose,
+  onSubmit,
+  submitting,
+}: {
+  draft: { orderId: string; rating: number; comment: string };
+  onClose: () => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  const setRating = (value: number) => {
+    draft.rating = value;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Rate your order</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Close
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+          Order ID: {draft.orderId}
+        </p>
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Rating</p>
+            <div className="mt-2 flex items-center gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRating(n)}
+                  className={`h-9 w-9 rounded-full border text-sm font-semibold ${
+                    draft.rating >= n
+                      ? 'border-amber-500 bg-amber-500 text-white'
+                      : 'border-zinc-300 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200'
+                  }`}
+                  aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                  title={`${n} star${n > 1 ? 's' : ''}`}
+                >
+                  {n}★
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Feedback</p>
+            <textarea
+              defaultValue={draft.comment}
+              onChange={(e) => (draft.comment = e.target.value)}
+              placeholder="What went well? What could improve?"
+              className="mt-2 w-full rounded-md border border-zinc-300 p-2 text-sm text-zinc-900 shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              rows={4}
+              maxLength={1000}
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={submitting || draft.rating < 1}
+            onClick={onSubmit}
+            className="rounded-md bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-amber-300"
+          >
+            {submitting ? 'Submitting...' : 'Submit review'}
+          </button>
+        </div>
       </div>
     </div>
   );

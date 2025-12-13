@@ -18,6 +18,8 @@ import { UserRole } from '../users/user-role.enum';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { UserThrottlerGuard } from '../common/user-throttler.guard';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -70,6 +72,8 @@ export class OrdersController {
   }
 
   @Patch(':orderId/status')
+  @UseGuards(JwtAuthGuard, RolesGuard, UserThrottlerGuard)
+  @Throttle({ default: { limit: 15, ttl: 60 } })
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   updateStatus(
     @Param('orderId', ParseUUIDPipe) orderId: string,
@@ -83,6 +87,8 @@ export class OrdersController {
   }
 
   @Patch(':orderId/assign-rider')
+  @UseGuards(JwtAuthGuard, RolesGuard, UserThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60 } })
   @Roles(UserRole.ADMIN, UserRole.VENDOR_MANAGER)
   assignRider(
     @Param('orderId', ParseUUIDPipe) orderId: string,
@@ -96,6 +102,8 @@ export class OrdersController {
   }
 
   @Patch(':orderId/rider-status')
+  @UseGuards(JwtAuthGuard, RolesGuard, UserThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60 } })
   @Roles(UserRole.RIDER)
   updateStatusForRider(
     @Param('orderId', ParseUUIDPipe) orderId: string,

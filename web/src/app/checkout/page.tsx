@@ -14,6 +14,11 @@ export default function CheckoutPage() {
   const [placed, setPlaced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoApplying, setPromoApplying] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
@@ -27,6 +32,14 @@ export default function CheckoutPage() {
   const hasSelectedAddress = !!selectedAddressId;
   const canConfirm =
     hasItems && !submitting && !loginRequired && (!addressRequired || hasSelectedAddress);
+  const finalTotal = Math.max(total - promoDiscount, 0);
+
+  useEffect(() => {
+    // reset promo if cart changes
+    setPromoDiscount(0);
+    setAppliedPromoCode(null);
+    setPromoError(null);
+  }, [items]);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -86,6 +99,7 @@ export default function CheckoutPage() {
         items: items.map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
         ...(branchId ? { branchId } : {}),
         ...(selectedAddressId ? { addressId: selectedAddressId } : {}),
+        ...(appliedPromoCode ? { promoCode: appliedPromoCode } : {}),
       };
 
       await api.post('/orders', payload, token);
@@ -154,13 +168,25 @@ export default function CheckoutPage() {
                   </div>
                 ))}
 
-                <div className="mt-2 flex items-center justify-between border-t border-dashed border-zinc-200 pt-2 text-sm dark:border-zinc-700">
-                  <span className="font-medium text-zinc-800 dark:text-zinc-100">
-                    Total
-                  </span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-                    {`৳ ${total.toFixed(2)}`}
-                  </span>
+                <div className="mt-2 space-y-1 border-t border-dashed border-zinc-200 pt-2 text-sm dark:border-zinc-700">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-700 dark:text-zinc-200">Subtotal</span>
+                    <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {`৳ ${total.toFixed(2)}`}
+                    </span>
+                  </div>
+                  {promoDiscount > 0 && (
+                    <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-300">
+                      <span className="flex items-center gap-1 text-xs font-semibold">
+                        Promo {appliedPromoCode ? `(${appliedPromoCode})` : ''}
+                      </span>
+                      <span className="text-sm font-semibold">{`- ৳ ${promoDiscount.toFixed(2)}`}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <span>Total</span>
+                    <span>{`৳ ${finalTotal.toFixed(2)}`}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -189,6 +215,81 @@ export default function CheckoutPage() {
           </div>
 
           <div className="space-y-3 rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-700">
+            <div className="space-y-2 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                  Apply promo code
+                </span>
+                {appliedPromoCode && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
+                    {appliedPromoCode}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="SUMMER10"
+                  className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                />
+                <button
+                  type="button"
+                  disabled={!promoCode || promoApplying || !hasItems}
+                  onClick={async () => {
+                    const token = getAccessToken();
+                    if (!token) {
+                      setPromoError('Please sign in to apply a promo code.');
+                      router.push('/auth/login');
+                      return;
+                    }
+                    if (!hasItems) {
+                      setPromoError('Add items to your cart first.');
+                      return;
+                    }
+                    setPromoApplying(true);
+                    setPromoError(null);
+                    try {
+                      const res = await api.post<{ discount: number; total: number; code: string }>(
+                        '/promotions/preview',
+                        {
+                          code: promoCode,
+                          orderSubtotal: total,
+                          items: items.map((line) => ({
+                            itemId: line.itemId,
+                            quantity: line.quantity,
+                            basePrice: line.basePrice,
+                          })),
+                          ...(branchId ? { branchId } : {}),
+                        },
+                        token,
+                      );
+                      setPromoDiscount(res.discount);
+                      setAppliedPromoCode(res.code);
+                    } catch (err: any) {
+                      setPromoError(err?.message ?? 'Unable to apply promo code');
+                      setPromoDiscount(0);
+                      setAppliedPromoCode(null);
+                    } finally {
+                      setPromoApplying(false);
+                    }
+                  }}
+                  className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  {promoApplying ? 'Applying...' : appliedPromoCode ? 'Reapply' : 'Apply'}
+                </button>
+              </div>
+              {promoError && (
+                <p className="text-[11px] text-red-500">{promoError}</p>
+              )}
+              {promoDiscount > 0 && (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                  Discount applied: ৳ {promoDiscount.toFixed(2)}
+                </p>
+              )}
+            </div>
+
             <div className="flex items-center justify-between">
               <span className="font-semibold text-zinc-800 dark:text-zinc-100">
                 Delivery address

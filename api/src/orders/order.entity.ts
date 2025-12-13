@@ -41,6 +41,12 @@ export class Order {
     quantity: number;
   }>;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discountTotal: number;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  promoCode?: string | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   totalAmount: number;
 
