@@ -4,19 +4,16 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import { getAccessToken, fetchCurrentUser } from '@/lib/auth';
-import type { User, Address } from '@/types/api';
-import {
-  profileSchema,
-  addressSchema,
-  type ProfileFormValues,
-  type AddressFormValues,
-} from './schemas';
+import { getAccessToken } from '@/lib/auth';
+import type { User } from '@/types/api';
+import { profileSchema, type ProfileFormValues } from './schemas';
+import { fetchProfile, updateProfile } from './services/profile';
+export { useAddresses } from './addresses/hooks/useAddresses';
 
 export function useProfileForm() {
+  const token = getAccessToken();
   const [profile, setProfile] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(Boolean(token));
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -27,15 +24,12 @@ export function useProfileForm() {
   });
 
   useEffect(() => {
-    const token = getAccessToken();
-
     if (!token) {
       toast.error('You are not logged in.');
-      setLoading(false);
       return;
     }
 
-    fetchCurrentUser(token)
+    fetchProfile(token)
       .then((data) => {
         setProfile(data);
         form.reset({
@@ -51,7 +45,7 @@ export function useProfileForm() {
       .finally(() => {
         setLoading(false);
       });
-  }, [form]);
+  }, [form, token]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     const token = getAccessToken();
@@ -62,8 +56,7 @@ export function useProfileForm() {
     }
 
     try {
-      const data = await api.patch<User>(
-        '/users/me',
+      const data = await updateProfile(
         {
           name: values.name || undefined,
           phone: values.phone || undefined,
@@ -82,143 +75,3 @@ export function useProfileForm() {
   return { profile, loading, form, handleSubmit };
 }
 
-export function useAddresses() {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const form = useForm<AddressFormValues>({
-    resolver: zodResolver(addressSchema),
-    defaultValues: {
-      label: '',
-      line1: '',
-      line2: '',
-      city: '',
-      postalCode: '',
-      country: '',
-      lat: '',
-      lng: '',
-      isDefault: false,
-    },
-  });
-
-  const loadAddresses = () => {
-    const token = getAccessToken();
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      setLoading(false);
-      return;
-    }
-
-    api
-      .get<Address[]>('/addresses', token)
-      .then((data) => {
-        setAddresses(data);
-      })
-      .catch((err: unknown) => {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load addresses';
-        toast.error(message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    loadAddresses();
-  }, []);
-
-  const handleSubmit = form.handleSubmit(async (values) => {
-    const token = getAccessToken();
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.post<Address>(
-        '/addresses',
-        {
-          label: values.label,
-          line1: values.line1,
-          line2: values.line2 || undefined,
-          city: values.city,
-          postalCode: values.postalCode || undefined,
-          country: values.country,
-          lat: values.lat ? Number(values.lat) : undefined,
-          lng: values.lng ? Number(values.lng) : undefined,
-          isDefault: values.isDefault ?? false,
-        },
-        token,
-      );
-
-      form.reset({
-        label: '',
-        line1: '',
-        line2: '',
-        city: '',
-        postalCode: '',
-        country: '',
-        lat: '',
-        lng: '',
-        isDefault: false,
-      });
-
-      toast.success('Address added.');
-      loadAddresses();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to add address';
-      toast.error(message);
-    }
-  });
-
-  const deleteAddress = async (id: string) => {
-    const token = getAccessToken();
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.delete<void>(`/addresses/${id}`, token);
-      toast.success('Address deleted.');
-      loadAddresses();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to delete address';
-      toast.error(message);
-    }
-  };
-
-  const makeDefault = async (id: string) => {
-    const token = getAccessToken();
-
-    if (!token) {
-      toast.error('You are not logged in.');
-      return;
-    }
-
-    try {
-      await api.patch<Address>(`/addresses/${id}`, { isDefault: true }, token);
-      toast.success('Default address updated.');
-      loadAddresses();
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to update address';
-      toast.error(message);
-    }
-  };
-
-  return {
-    addresses,
-    loading,
-    form,
-    handleSubmit,
-    deleteAddress,
-    makeDefault,
-  };
-}

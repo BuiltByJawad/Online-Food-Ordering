@@ -7,6 +7,7 @@ import {
   IsUUID,
   Min,
   ValidateNested,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -30,7 +31,12 @@ export class CreateOrderDto {
   @IsUUID()
   branchId?: string;
 
-   @IsOptional()
-   @IsUUID()
-   addressId?: string;
+  @IsOptional()
+  @IsUUID()
+  addressId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  promoCode?: string;
 }

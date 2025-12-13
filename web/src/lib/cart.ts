@@ -28,7 +28,7 @@ function loadCartFromStorage(): CartState {
       return { branchId: null, items: [] };
     }
 
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
 
     // Backwards compatibility: old format was an array of CartLine.
     if (Array.isArray(parsed)) {
@@ -41,14 +41,12 @@ function loadCartFromStorage(): CartState {
     if (
       parsed &&
       typeof parsed === 'object' &&
-      Array.isArray((parsed as any).items)
+      Array.isArray((parsed as { items?: unknown }).items)
     ) {
+      const safe = parsed as { branchId?: unknown; items?: unknown };
       return {
-        branchId:
-          typeof (parsed as any).branchId === 'string'
-            ? (parsed as any).branchId
-            : null,
-        items: (parsed as any).items as CartLine[],
+        branchId: typeof safe.branchId === 'string' ? safe.branchId : null,
+        items: safe.items as CartLine[],
       };
     }
 
@@ -71,11 +69,7 @@ function saveCartToStorage(state: CartState): void {
 }
 
 export function useCart() {
-  const [cart, setCart] = useState<CartState>({ branchId: null, items: [] });
-
-  useEffect(() => {
-    setCart(loadCartFromStorage());
-  }, []);
+  const [cart, setCart] = useState<CartState>(() => loadCartFromStorage());
 
   useEffect(() => {
     saveCartToStorage(cart);

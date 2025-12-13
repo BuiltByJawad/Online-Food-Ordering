@@ -1,86 +1,28 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
 import { useOrders } from './hooks';
 import type { OrderStatus } from '@/types/orders';
-
-interface BranchPublicInfo {
-  id: string;
-  name: string;
-  city: string;
-  country: string;
-  vendorName: string | null;
-}
+import { ReviewModal } from './components/ReviewModal';
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { orders, loading, error, reload } = useOrders();
+  const {
+    orders,
+    loading,
+    error,
+    authRequired,
+    branchLabels,
+    reviewed,
+    reload,
+    review,
+  } = useOrders();
 
-  const [branchLabels, setBranchLabels] = useState<Record<string, string>>({});
-
-  const branchIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          orders
-            .map((order) => order.branchId)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0),
-        ),
-      ),
-    [orders],
+  const statusSteps: OrderStatus[] = useMemo(
+    () => ['created', 'accepted', 'preparing', 'completed'],
+    [],
   );
-
-  useEffect(() => {
-    if (branchIds.length === 0) {
-      setBranchLabels({});
-      return;
-    }
-
-    let isActive = true;
-
-    const load = async () => {
-      try {
-        const results = await Promise.all(
-          branchIds.map((id) =>
-            api
-              .get<BranchPublicInfo>(`/branches/${id}/info`)
-              .then((data) => ({ id, data }))
-              .catch(() => ({ id, data: null })),
-          ),
-        );
-
-        if (!isActive) return;
-
-        const next: Record<string, string> = {};
-
-        for (const { id, data } of results) {
-          if (!data) continue;
-
-          const vendorPrefix =
-            data.vendorName && data.vendorName !== data.name
-              ? `${data.vendorName} - `
-              : '';
-          const citySuffix = data.city ? ` (${data.city})` : '';
-
-          next[id] = `${vendorPrefix}${data.name}${citySuffix}`;
-        }
-
-        setBranchLabels(next);
-      } catch {
-        // If branch lookup fails, we silently fall back to showing the raw branch ID.
-      }
-    };
-
-    load();
-
-    return () => {
-      isActive = false;
-    };
-  }, [branchIds]);
-
-  const statusSteps: OrderStatus[] = ['created', 'accepted', 'preparing', 'completed'];
 
   const renderTimeline = (status: string) => {
     if (status === 'cancelled') {
@@ -196,8 +138,6 @@ export default function OrdersPage() {
       </div>
     );
   }
-
-  const authRequired = error === 'AUTH_REQUIRED';
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-zinc-50 px-4 py-8 dark:bg-black">
@@ -346,12 +286,37 @@ export default function OrdersPage() {
                       </p>
                     </div>
                   ))}
+                  {order.status === 'completed' && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {reviewed[order.id] ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
+                          ✓ Review submitted
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => review.openReview(order.id)}
+                          className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-500"
+                        >
+                          Rate this order
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      <ReviewModal
+        open={Boolean(review.activeOrderId)}
+        orderId={review.activeOrderId}
+        submitting={review.submittingReview}
+        form={review.form}
+        onClose={review.closeReview}
+        onSubmit={review.handleSubmitReview}
+      />
     </div>
   );
 }

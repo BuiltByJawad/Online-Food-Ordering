@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect } from '@playwright/test';
 
 const baseUrlVmEmail = process.env.E2E_VM_EMAIL;

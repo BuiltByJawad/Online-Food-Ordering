@@ -37,6 +37,8 @@ export interface Order {
   id: string;
   items: OrderItemLine[];
   totalAmount: number;
+  discountTotal?: number;
+  promoCode?: string | null;
   status: string;
   createdAt: string;
   updatedAt?: string;
@@ -49,6 +51,7 @@ export interface CreateOrderPayload {
   items: OrderItemInput[];
   branchId?: string | null;
   addressId?: string | null;
+  promoCode?: string | null;
 }
 
 export interface BranchAnalytics {

@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { getAccessToken, fetchCurrentUser } from '@/lib/auth';
 import type { MenuCategory } from '@/types/api';
 import type {
@@ -11,49 +10,65 @@ import type {
   ItemFormValues,
   OptionFormValues,
 } from './schemas';
+import {
+  fetchBranchMenu,
+  createMenuCategory,
+  createMenuItem,
+  createMenuOption,
+  deleteMenuCategory,
+  deleteMenuItem,
+  toggleMenuItemAvailability,
+  deleteMenuOption,
+} from './services/menu';
 
 export function useBranchMenu(branchId: string) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const cache = useRef<MenuCategory[] | null>(null);
 
-  useEffect(() => {
-    const loadMenu = async () => {
-      const token = getAccessToken();
+  const loadMenu = useCallback(async () => {
+    const token = getAccessToken();
 
-      if (!token) {
-        toast.error('You are not logged in.');
-        router.replace('/auth/login');
-        return;
+    if (!token) {
+      toast.error('You are not logged in.');
+      router.replace('/auth/login');
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      const user = await fetchCurrentUser(token);
+
+      if (user.role !== 'vendor_manager') {
+        toast.error('You do not have access to the vendor portal.');
+        router.replace('/');
+        return false;
       }
 
-      try {
-        const user = await fetchCurrentUser(token);
-
-        if (user.role !== 'vendor_manager') {
-          toast.error('You do not have access to the vendor portal.');
-          router.replace('/');
-          return;
-        }
-
-        const data = await api.get<MenuCategory[]>(
-          `/branches/${branchId}/menu`,
-          token,
-        );
-        setCategories(data);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load branch menu';
-        toast.error(message);
-      } finally {
-        setLoading(false);
+      if (cache.current) {
+        setCategories(cache.current);
       }
-    };
 
-    loadMenu();
+      const data = await fetchBranchMenu(branchId, token);
+      setCategories(data ?? []);
+      cache.current = data ?? [];
+      return true;
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load branch menu';
+      toast.error(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
   }, [branchId, router]);
 
-  const refreshMenu = async () => {
+  useEffect(() => {
+    void loadMenu();
+  }, [loadMenu]);
+
+  const refreshMenu = useCallback(async () => {
     const token = getAccessToken();
 
     if (!token) {
@@ -62,11 +77,10 @@ export function useBranchMenu(branchId: string) {
     }
 
     try {
-      const data = await api.get<MenuCategory[]>(
-        `/branches/${branchId}/menu`,
-        token,
-      );
-      setCategories(data);
+      const data = await fetchBranchMenu(branchId, token);
+      const list = data ?? [];
+      cache.current = list;
+      setCategories(list);
       return true;
     } catch (err: unknown) {
       const message =
@@ -74,7 +88,7 @@ export function useBranchMenu(branchId: string) {
       toast.error(message);
       return false;
     }
-  };
+  }, [branchId]);
 
   const createCategory = async (
     values: CategoryFormValues,
@@ -86,19 +100,10 @@ export function useBranchMenu(branchId: string) {
       return false;
     }
 
-    const sortOrder = values.sortOrder ? Number(values.sortOrder) : undefined;
-
     try {
-      await api.post(
-        `/branches/${branchId}/menu-categories`,
-        {
-          name: values.name,
-          sortOrder,
-        },
-        token,
-      );
-
+      await createMenuCategory(branchId, values, token);
       toast.success('Category created.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {
@@ -117,23 +122,11 @@ export function useBranchMenu(branchId: string) {
       return false;
     }
 
-    const basePrice = Number(values.basePrice);
-
     try {
-      await api.post(
-        `/menu-categories/${values.categoryId}/items`,
-        {
-          name: values.name,
-          description: values.description || undefined,
-          imageUrl: values.imageUrl || undefined,
-          basePrice,
-          taxCategory: values.taxCategory || undefined,
-          isAvailable: values.isAvailable ?? true,
-        },
-        token,
-      );
+      await createMenuItem(values, token);
 
       toast.success('Menu item created.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {
@@ -154,25 +147,11 @@ export function useBranchMenu(branchId: string) {
       return false;
     }
 
-    const priceDelta = values.priceDelta ? Number(values.priceDelta) : 0;
-    const maxSelection = values.maxSelection
-      ? Number(values.maxSelection)
-      : undefined;
-
     try {
-      await api.post(
-        `/menu-items/${values.itemId}/options`,
-        {
-          type: values.type,
-          name: values.name,
-          priceDelta,
-          isRequired: values.isRequired ?? false,
-          maxSelection,
-        },
-        token,
-      );
+      await createMenuOption(values, token);
 
       toast.success('Menu option created.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {
@@ -192,8 +171,9 @@ export function useBranchMenu(branchId: string) {
     }
 
     try {
-      await api.delete(`/menu-categories/${categoryId}`, token);
+      await deleteMenuCategory(categoryId, token);
       toast.success('Category deleted.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {
@@ -213,8 +193,9 @@ export function useBranchMenu(branchId: string) {
     }
 
     try {
-      await api.delete(`/menu-items/${itemId}`, token);
+      await deleteMenuItem(itemId, token);
       toast.success('Menu item deleted.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {
@@ -237,12 +218,9 @@ export function useBranchMenu(branchId: string) {
     }
 
     try {
-      await api.patch(
-        `/menu-items/${itemId}`,
-        { isAvailable: !current },
-        token,
-      );
+      await toggleMenuItemAvailability(itemId, !current, token);
       toast.success('Item availability updated.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {
@@ -262,8 +240,9 @@ export function useBranchMenu(branchId: string) {
     }
 
     try {
-      await api.delete(`/menu-options/${optionId}`, token);
+      await deleteMenuOption(optionId, token);
       toast.success('Menu option deleted.');
+      cache.current = null;
       await refreshMenu();
       return true;
     } catch (err: unknown) {

@@ -16,6 +16,8 @@ import { UsersService } from '../users/users.service';
 import { OrdersNotificationsService } from './orders-notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 import { AuditService } from '../audit/audit.service';
+import { OrdersEventsGateway } from './orders-events.gateway';
+import { PromotionsService } from '../promotions/promotions.service';
 interface CurrentUserPayload {
   userId: string;
   role: UserRole;
@@ -36,6 +38,8 @@ export class OrdersService {
     private readonly ordersNotificationsService: OrdersNotificationsService,
     private readonly paymentsService: PaymentsService,
     private readonly auditService: AuditService,
+    private readonly ordersEventsGateway: OrdersEventsGateway,
+    private readonly promotionsService: PromotionsService,
   ) {}
 
   async createForUser(userId: string, dto: CreateOrderDto): Promise<Order> {
@@ -86,9 +90,30 @@ export class OrdersService {
       };
     }
 
+    let discountTotal = 0;
+    let appliedPromo: { code: string; total: number; discount: number } | null =
+      null;
+    if (dto.promoCode && total > 0) {
+      appliedPromo = await this.promotionsService.applyAndConsume({
+        code: dto.promoCode,
+        orderSubtotal: total,
+        items: lines.map((l) => ({
+          itemId: l.itemId,
+          quantity: l.quantity,
+          basePrice: l.basePrice,
+        })),
+        userId,
+        branchId: branchId ?? undefined,
+      });
+      discountTotal = appliedPromo.discount;
+      total = appliedPromo.total;
+    }
+
     const order = this.ordersRepository.create({
       user: { id: userId } as any,
       items: lines,
+      promoCode: appliedPromo?.code ?? null,
+      discountTotal,
       totalAmount: total,
       status: 'created',
       paymentStatus: 'unpaid',
@@ -96,7 +121,24 @@ export class OrdersService {
       deliveryAddress,
     });
 
-    return this.ordersRepository.save(order);
+    const saved = await this.ordersRepository.save(order);
+
+    if (appliedPromo) {
+      await this.auditService.record({
+        actorId: userId,
+        actorRole: UserRole.CUSTOMER,
+        action: 'order.promo.applied',
+        entityType: 'order',
+        entityId: saved.id,
+        after: {
+          promoCode: appliedPromo.code,
+          discountTotal,
+          totalAmount: total,
+        },
+      });
+    }
+
+    return saved;
   }
 
   async findForUser(userId: string): Promise<Order[]> {
@@ -266,6 +308,7 @@ export class OrdersService {
       after: { status },
     });
     await this.ordersNotificationsService.notifyStatusChange(saved);
+    this.ordersEventsGateway.emitStatusUpdated(saved);
     return saved;
   }
 
@@ -311,6 +354,7 @@ export class OrdersService {
       before: { riderId: beforeRiderId },
       after: { riderId: rider.id },
     });
+    this.ordersEventsGateway.emitRiderAssigned(saved);
     return saved;
   }
 
@@ -345,28 +389,31 @@ export class OrdersService {
       after: { status },
     });
     await this.ordersNotificationsService.notifyStatusChange(saved);
+    this.ordersEventsGateway.emitStatusUpdated(saved);
     return saved;
   }
 
   async createPaymentIntent(
     orderId: string,
     user: CurrentUserPayload,
+    idempotencyKey?: string,
   ): Promise<{
     clientSecret: string;
     amount: number;
     currency: string;
     paymentStatus: string;
   }> {
-    return this.paymentsService.createPaymentIntent(orderId, user);
+    return this.paymentsService.createPaymentIntent(orderId, user, idempotencyKey);
   }
 
   async confirmPaymentIntent(
     orderId: string,
     user: CurrentUserPayload,
+    idempotencyKey?: string,
   ): Promise<{
     status: 'succeeded';
     paymentStatus: string;
   }> {
-    return this.paymentsService.confirmPaymentIntent(orderId, user);
+    return this.paymentsService.confirmPaymentIntent(orderId, user, idempotencyKey);
   }
 }

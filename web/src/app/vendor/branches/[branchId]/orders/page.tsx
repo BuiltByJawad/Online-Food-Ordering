@@ -3,24 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import { useBranchOrders } from './hooks';
 import type { OrderStatus } from '@/types/orders';
 import type { User } from '@/types/api';
+import { searchRiders, fetchBranchInfo } from './services/orders';
 
 interface BranchOrdersPageProps {
   params: {
     branchId: string;
   };
-}
-
-interface BranchPublicInfo {
-  id: string;
-  name: string;
-  city: string;
-  country: string;
-  vendorName: string | null;
 }
 
 const STATUS_OPTIONS: OrderStatus[] = [
@@ -35,7 +27,7 @@ const PER_PAGE = 10;
 export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
   const { branchId } = params;
   const router = useRouter();
-  const { orders, loading, error, updatingIds, updateStatus, reload, assignRider } =
+  const { orders, loading, error, updatingIds, reload, assignRider } =
     useBranchOrders(branchId);
   const [branchLabel, setBranchLabel] = useState<string | null>(null);
   const [riderSearchQuery, setRiderSearchQuery] = useState('');
@@ -48,8 +40,7 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
   useEffect(() => {
     let active = true;
 
-    api
-      .get<BranchPublicInfo>(`/branches/${branchId}/info`)
+    fetchBranchInfo(branchId)
       .then((data) => {
         if (!active || !data) return;
         const vendorPrefix =
@@ -68,7 +59,7 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
     };
   }, [branchId]);
 
-  const searchRiders = async () => {
+  const searchRidersAction = async () => {
     const token = getAccessToken();
 
     if (!token) {
@@ -81,10 +72,7 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
 
     try {
       const query = riderSearchQuery.trim();
-      const url = query.length
-        ? `/users/riders?q=${encodeURIComponent(query)}`
-        : '/users/riders';
-      const data = await api.get<User[]>(url, token);
+      const data = await searchRiders(query, token);
       setRiderResults(data ?? []);
       if (!data || data.length === 0) {
         toast.message('No riders found for that search.');
@@ -97,7 +85,6 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
     }
   };
 
-  const hasOrders = orders.length > 0;
   const filteredOrders = useMemo(() => {
     const base = statusFilter === 'all'
       ? orders
@@ -247,7 +234,7 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
               />
               <button
                 type="button"
-                onClick={() => void searchRiders()}
+                onClick={() => void searchRidersAction()}
                 disabled={riderSearchLoading}
                 className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
               >
@@ -373,20 +360,6 @@ export default function BranchOrdersPage({ params }: BranchOrdersPageProps) {
                           </span>
                         )}
                       </div>
-                      <select
-                        value={order.status}
-                        disabled={isUpdating}
-                        onChange={(event) =>
-                          updateStatus(order.id, event.target.value as OrderStatus)
-                        }
-                        className="mt-1 w-40 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
                       <div className="mt-2 flex items-center gap-2">
                         <select
                           value={selectedRiderId}

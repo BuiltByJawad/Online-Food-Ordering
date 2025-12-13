@@ -10,22 +10,23 @@ export function useCustomerBranchMenu(branchId: string) {
 
   useEffect(() => {
     let isActive = true;
-    setLoading(true);
 
-    api
-      .get<MenuCategory[]>(`/branches/${branchId}/menu`)
-      .then((data) => {
+    const loadMenu = async () => {
+      try {
+        const data = await api.get<MenuCategory[]>(`/branches/${branchId}/menu`);
         if (!isActive) return;
-        setCategories(data);
-      })
-      .catch(() => {
+        setCategories(data ?? []);
+      } catch {
         if (!isActive) return;
         setCategories([]);
-      })
-      .finally(() => {
+      } finally {
         if (!isActive) return;
         setLoading(false);
-      });
+      }
+    };
+
+    setLoading(true);
+    void loadMenu();
 
     return () => {
       isActive = false;
